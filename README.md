@@ -35,7 +35,9 @@ catalog.json : 영화 제목, 개봉일, 상영 시간, 포스터 경로, 줄거
 
 Movie : 영화 한 편의 기본 정보
 movie\_id     : 영화 한 편을 구분하는 고유 번호
+
 title           : 사이트에서 대표로 보여줄 영화 제목
+
 ~~original\_title : 작품의 원래 언어로 된 제목~~
 
 release\_date	: 영화의 개봉 날짜
