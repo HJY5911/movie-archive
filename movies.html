@@ -1,0 +1,59 @@
+<!doctype html>
+<!-- 표준 HTML 문서로 해석하도록 선언합니다. 실제 화면 내용은 body에 둡니다. -->
+<html lang="ko">
+<!-- lang="ko"는 문서의 기본 언어가 한국어임을 알립니다. -->
+<head>
+  <!-- 한글을 포함한 문자를 UTF-8 인코딩으로 읽습니다. -->
+  <meta charset="UTF-8">
+  <!-- 화면을 표시할 기준 폭과 초기 배율을 지정합니다. 배치 자체는 CSS가 정합니다. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- 검색 서비스 등에 제공할 설명입니다. 본문에 직접 표시되는 글자는 아닙니다. -->
+  <meta name="description" content="영화 제목, 별칭, 배우와 감독으로 영화를 검색합니다.">
+  <!-- 브라우저 탭의 초기 제목입니다. boot()가 실행되면 JS에서 지정한 제목으로 바뀝니다. -->
+  <title>영화 검색</title>
+  <!-- 파비콘은 브라우저 탭에 사용하는 아이콘입니다. 본문의 포스터 이미지와는 별개입니다. -->
+  <link rel="icon" type="image/jpeg" href="assets/favicon.jpg">
+  <!-- 메인·캘린더와 같은 CSS를 연결해 글꼴, 메뉴, 버튼 모양을 통일합니다. -->
+  <link rel="stylesheet" href="css/common.css">
+  <!--
+    movies.html은 공통 HTML 틀이고 실제 본문은 아래 JS가 만듭니다.
+    movies.js가 검색창·결과 개수·영화 목록을 만들고 상세 페이지 링크를 연결합니다.
+    type="module"은 import/export를 사용하는 모듈로 실행한다는 뜻입니다.
+    async 속성이 없는 모듈 스크립트이므로 HTML 해석이 끝난 뒤 실행되어 #app 등을 찾을 수 있습니다.
+    src는 HTML 기준 경로이고, JS 내부 import의 경로는 해당 JS 파일 기준입니다.
+  -->
+  <script type="module" src="js/pages/movies.js"></script>
+</head>
+<body>
+  <!-- 같은 문서의 id="app" 영역으로 이동합니다. 메인 페이지를 다시 여는 링크가 아닙니다. -->
+  <a href="#app" class="skip-link">본문으로 바로가기</a>
+  <!-- ui.js의 mountShell()이 공통 메뉴(nav와 링크들)를 넣을 빈 자리입니다. -->
+  <aside id="sidebar"></aside>
+  <!-- 상단 안내, 본문, 하단 안내를 한 묶음으로 관리하는 일반 div입니다. -->
+  <div class="main-wrap">
+    <!-- boot()가 저장 위치 안내를 채우며, #messages도 이곳으로 옮깁니다. -->
+    <header id="topbar"></header>
+    <!--
+      각 페이지의 render 함수가 완성한 요소들을 이 안에 넣습니다.
+      tabindex="-1"은 일반 Tab 이동 순서에서 빼되 코드 등으로 초점을 줄 수 있게 합니다.
+      JS가 본문을 다시 그려도 main 자체는 남고 그 안의 자식 요소만 교체됩니다.
+    -->
+    <main id="app" tabindex="-1"></main>
+    <!-- CSS에서 가운데 정렬하는 공통 하단 안내입니다. -->
+    <footer>
+      <!-- &copy;는 화면에 © 문자로 표시하는 HTML 문자 참조입니다. -->
+      <p>&copy; 2026 32조. 팀프로젝트.</p>
+      <!-- 예시 연락처를 글자로 표시합니다. 자동 메일 전송 기능은 없습니다. -->
+      <p>대표 이메일: teamproject@example.com</p>
+    </footer>
+  </div>
+  <!--
+    showMessage()가 저장 성공이나 오류 문구를 넣습니다. hidden으로 처음에는 숨깁니다.
+    role="status"와 aria-live="polite"는 내용 변경을 화면 읽기 프로그램에 알리는 설정입니다.
+    이 영역은 boot()가 상단 안내 쪽으로 옮겨 페이지 위쪽에 보이도록 합니다.
+  -->
+  <div id="messages" role="status" aria-live="polite" hidden></div>
+  <!-- JS가 꺼져 있을 때의 안내입니다. JS 실행 오류를 자동으로 대신 표시하는 요소는 아닙니다. -->
+  <noscript>이 웹사이트는 JavaScript를 켜야 사용할 수 있습니다.</noscript>
+</body>
+</html>

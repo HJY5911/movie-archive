@@ -1,0 +1,78 @@
+{
+  "Movie": [
+    {"movie_id":"m001","title":"달빛 우체국","release_date":"2018-01-01","runtime_min":85,"poster_url":"assets/posters/m001.jpg","overview":"잊힌 편지를 배달하는 작은 우체국에서 서로의 마음을 다시 발견하는 이야기. 이 작품과 인물 정보는 웹 프로젝트 시연을 위해 만든 가상 자료입니다."},
+    {"movie_id":"m002","title":"달빛 우체국: 돌아오는 편지","release_date":"2020-09-09","runtime_min":109,"poster_url":"assets/posters/m009.jpg","overview":"익숙한 동네에서 뜻밖의 만남과 작은 변화를 마주하는 이야기. 이 작품과 인물 정보는 웹 프로젝트 시연을 위해 만든 가상 자료입니다."},
+    {"movie_id":"m003","title":"달빛 우체국: 마지막 배달","release_date":"2023-05-17","runtime_min":133,"poster_url":"assets/posters/m017.jpg","overview":"우연히 발견한 특별한 장소에서 자신의 선택을 돌아보는 이야기. 이 작품과 인물 정보는 웹 프로젝트 시연을 위해 만든 가상 자료입니다."},
+    {"movie_id":"m004","title":"이름 없는 계절","release_date":null,"runtime_min":null,"poster_url":"assets/posters/m019.jpg","overview":"잊힌 편지를 배달하는 작은 우체국에서 서로의 마음을 다시 발견하는 이야기. 이 작품과 인물 정보는 웹 프로젝트 시연을 위해 만든 가상 자료입니다."}
+  ],
+  "MovieAlias": [
+    {"alias_id":"a001","movie_id":"m001","alias":"달우1"},
+    {"alias_id":"a002","movie_id":"m002","alias":"달우2"},
+    {"alias_id":"a003","movie_id":"m003","alias":"달우3"},
+    {"alias_id":"a004","movie_id":"m004","alias":"이름없는계"}
+  ],
+  "Person": [
+    {"person_id":"p01","name":"홍길동1"},
+    {"person_id":"p02","name":"홍길동2"},
+    {"person_id":"p03","name":"홍길동3"},
+    {"person_id":"p04","name":"홍길동4"},
+    {"person_id":"p05","name":"홍길동5"},
+    {"person_id":"p06","name":"홍길동6"},
+    {"person_id":"p07","name":"홍길동7"},
+    {"person_id":"p08","name":"홍길동8"}
+  ],
+  "MovieCredit": [
+    {"movie_id":"m001","person_id":"p01","role":"director"},
+    {"movie_id":"m001","person_id":"p05","role":"actor"},
+    {"movie_id":"m001","person_id":"p01","role":"actor"},
+    {"movie_id":"m002","person_id":"p04","role":"director"},
+    {"movie_id":"m002","person_id":"p08","role":"actor"},
+    {"movie_id":"m003","person_id":"p02","role":"director"},
+    {"movie_id":"m003","person_id":"p06","role":"actor"},
+    {"movie_id":"m004","person_id":"p03","role":"director"},
+    {"movie_id":"m004","person_id":"p07","role":"actor"}
+  ],
+  "Genre": [
+    {"genre_id":"g01","name":"드라마"},
+    {"genre_id":"g02","name":"모험"},
+    {"genre_id":"g03","name":"애니메이션"},
+    {"genre_id":"g04","name":"판타지"}
+  ],
+  "MovieGenre": [
+    {"movie_id":"m001","genre_id":"g01"},
+    {"movie_id":"m001","genre_id":"g03"},
+    {"movie_id":"m002","genre_id":"g01"},
+    {"movie_id":"m002","genre_id":"g03"},
+    {"movie_id":"m003","genre_id":"g01"},
+    {"movie_id":"m003","genre_id":"g03"},
+    {"movie_id":"m004","genre_id":"g02"},
+    {"movie_id":"m004","genre_id":"g04"}
+  ],
+  "Country": [
+    {"country_code":"KR","name":"대한민국","pin_lat":36.3,"pin_lng":127.8},
+    {"country_code":"US","name":"미국","pin_lat":39.5,"pin_lng":-98.4},
+    {"country_code":"DE","name":"독일","pin_lat":51,"pin_lng":10.5},
+    {"country_code":"AU","name":"호주","pin_lat":-25,"pin_lng":134}
+  ],
+  "MovieCountry": [
+    {"movie_id":"m001","country_code":"KR"},
+    {"movie_id":"m001","country_code":"US"},
+    {"movie_id":"m002","country_code":"AU"},
+    {"movie_id":"m003","country_code":"DE"},
+    {"movie_id":"m004","country_code":"AU"},
+    {"movie_id":"m004","country_code":"KR"}
+  ],
+  "Series": [
+    {"series_id":"s01","name":"달빛 우체국","description":"편지와 사람을 이어 주는 가상의 3부작입니다. 개봉순으로 표시합니다."}
+  ],
+  "SeriesMovie": [
+    {"series_id":"s01","movie_id":"m001","release_order":1},
+    {"series_id":"s01","movie_id":"m002","release_order":2},
+    {"series_id":"s01","movie_id":"m003","release_order":3}
+  ],
+  "AchievementRule": [
+    {"rule_id":"r01","metric":"unique_movie_count","target":3,"label":"세 편의 기억"},
+    {"rule_id":"r02","metric":"runtime_total","target":180,"label":"영화와 함께한 세 시간"},
+    {"rule_id":"r03","metric":"genre_count","target":3,"label":"세 가지 취향"}
+  ]
+}
