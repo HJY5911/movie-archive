@@ -1,5 +1,0 @@
-World map: Natural Earth, ne_110m_admin_0_countries. Public domain.
-https://www.naturalearthdata.com/about/terms-of-use/
-Source: https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson
-Projection: equirectangular. Simplified cartographic outlines are for movie origin browsing.
-Posters and favicon: original artwork for this fictional student demo, supplied as JPG images.
