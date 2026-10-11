@@ -2,116 +2,23 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <!--
-    index.html — 페이지의 기본 HTML 틀입니다.
-    파일 첫 줄의 <!doctype html>은 브라우저가 표준 HTML 방식으로 문서를 해석하도록 합니다.
-    <html lang="ko">는 문서의 기본 언어가 한국어임을 알려 발음·번역 등에서 참고하게 합니다.
-    <meta charset="UTF-8">은 한글 등의 문자를 UTF-8로 해석하라는 선언입니다.
-    인코딩을 일찍 알 수 있도록 charset 선언을 긴 설명 주석보다 앞에 두었습니다.
-    아래의 설명은 HTML 주석이므로 화면에 글자로 표시되지 않습니다.
-  -->
-  <!--
-    viewport는 모바일 등에서 페이지를 표시할 기준 폭과 초기 배율을 정합니다.
-    width=device-width는 기기의 화면 폭을 기준으로, initial-scale=1은 초기 배율 1로 표시합니다.
-    이 태그만으로 화면별 디자인이나 반응형 배치가 자동으로 만들어지지는 않습니다.
-  -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!--
-    검색 서비스 등에 전달할 페이지 설명입니다. 본문에 직접 표시되는 문구는 아닙니다.
-    content 속성의 문장은 팀에서 확정한 프로젝트 소개로 바꿀 수 있습니다.
-  -->
-  <meta name="description" content="감상 기록, 사진, 통계로 채우는 개인 영화 서랍 [프로젝트 제목]]"> <!-- [프로젝트 제목] 부분은 실제 프로젝트 제목으로 교체 필요 --> 
-  <!--
-    브라우저 탭에 표시할 초기 제목입니다.
-    ui.js의 boot()가 실행되는 페이지에서는 document.title에 의해 나중에 변경될 수 있습니다.
-  -->
-  <title>[프로젝트 제목]</title> <!-- 탭 제목 -->
-  <!--
-    외부 CSS 파일을 이 HTML에 연결합니다. rel="stylesheet"는 스타일시트라는 뜻입니다.
-    href="css/common.css"는 현재 HTML 파일 위치를 기준으로 css 폴더의 common.css를 가리킵니다.
-    CSS가 요소를 선택할 때 사용하는 id·class 이름은 HTML 또는 JS에서 만들어진 요소에 붙어 있습니다.
-  -->
+  <meta name="description" content="감상 기록, 사진, 통계로 채우는 개인 영화 서랍 [프로젝트 제목]]">
+  <title>[프로젝트 제목]</title>
   <link rel="stylesheet" href="css/common.css">
-  <!--
-    이 페이지에서 실행할 JavaScript 파일을 연결합니다. src는 현재 HTML 위치 기준 파일 경로입니다.
-    type="module"은 import/export를 사용할 수 있는 모듈로 읽으라는 뜻입니다.
-    현재처럼 async 속성이 없는 모듈 스크립트는 HTML 해석이 끝난 뒤 실행되므로 아래의 #app 등을 찾을 수 있습니다.
-    모듈 내부 import의 상대 경로는 HTML이 아니라 그 JS 파일의 위치를 기준으로 해석합니다.
-    index.js는 boot()를 호출하여 메뉴·영화 자료·저장된 감상 기록을 준비한 뒤 메인 화면을 그립니다.
-  -->
   <script type="module" src="js/pages/index.js"></script>
-<!--
-  head는 문자 인코딩·탭 제목·CSS·JS 연결 등 문서 정보를 담는 구역입니다. 여기서 head를 닫습니다.
--->
 </head>
-<!--
-  body 안에는 실제 화면에 표시할 내용과 JS가 사용할 영역을 둡니다.
-  이 페이지는 공통 틀을 HTML에 두고, 실제 메뉴와 본문은 각 페이지 JS에서 채우는 구조입니다.
--->
 <body>
-  <!--
-    href="#app"은 같은 문서에서 id="app"인 본문 영역으로 이동하는 링크입니다.
-    메뉴를 반복해서 지나지 않고 본문에 접근할 수 있게 합니다. 다른 HTML 파일을 여는 링크가 아닙니다.
-    class="skip-link"는 CSS에서 선택할 수 있는 이름입니다. 현재 최소 CSS에서는 이 링크를 그대로 표시합니다.
-  -->
-  <a href="#app" class="skip-link">본문으로 바로가기</a> <!-- main id="app"으로 이동 -->
-  <!--
-    공통 메뉴를 넣을 빈 영역입니다. aside는 보조 영역을 나타내는 HTML 태그입니다.
-    id="sidebar"는 문서 안에서 이 요소를 찾는 고유 이름이며, ui.js에서 querySelector("#sidebar")로 찾습니다.
-    현재 메뉴는 mountShell()에서 nav·ul·li·a 요소를 만들어 이 안에 넣습니다.
-  -->
+  <a href="#app" class="skip-link">본문으로 바로가기</a>
   <aside id="sidebar"></aside>
-  <!--
-    본문 쪽 요소들을 묶는 일반 컨테이너입니다. div 자체에는 특별한 표시나 동작이 없습니다.
-    class="main-wrap"는 공통 CSS나 JS에서 사용할 수 있는 이름이며, 클래스 이름 자체가 배치를 만들지는 않습니다.
-  -->
   <div class="main-wrap">
-    <!--
-      상단 안내를 넣을 빈 영역입니다. 현재 ui.js는 저장 위치 안내를 이 안에 만듭니다.
-      또한 #messages 요소를 이 안으로 옮겨 저장 결과나 오류 안내를 본문 위에 표시합니다.
-    -->
     <header id="topbar"></header>
-    <!--
-      main은 이 페이지의 핵심 본문입니다. id="app"으로 찾아 JS의 render 함수가 내용을 채웁니다.
-      tabindex="-1"은 일반 Tab 키 이동 순서에는 넣지 않으면서, 코드 등으로 초점을 줄 수 있게 합니다.
-      app이라는 id가 특별한 내장 기능을 갖는 것은 아니며 이 프로젝트가 정한 이름입니다.
-    -->
     <main id="app" tabindex="-1"></main>
-    <!--
-      하단 안내 영역입니다. 현재 저작권 문구와 예시 연락처를 담고 있습니다.
-      footer 태그 자체가 화면 맨 아래에 고정되거나 가운데 정렬되는 것은 아닙니다.
-    -->
     <footer>
-        <!--
-          p는 문단을 나타냅니다. &copy;는 화면에 저작권 기호 ©를 표시하는 HTML 문자 참조입니다.
-          이 문구를 넣는 것이 파일 저장이나 권한 설정을 수행하는 것은 아닙니다.
-        -->
         <p>&copy; 2026 32조. 팀프로젝트.</p>
-        <!--
-          현재는 이메일 주소를 글자로만 표시합니다. teamproject@example.com은 예시 주소입니다.
-          클릭해서 메일 작성 창을 여는 기능은 없으며, 그런 기능은 별도의 mailto: 링크로 구현합니다.
-        -->
         <p>대표 이메일: teamproject@example.com</p>
-    <!--
-      하단 안내 영역을 닫습니다.
-    -->
     </footer>
-  <!--
-    상단 안내·본문·하단 안내를 감싼 main-wrap 컨테이너를 닫습니다.
-  -->
   </div>
-  <!--
-    JS가 사용자에게 결과를 알리는 공통 메시지 영역입니다.
-    hidden은 처음에는 표시하지 말라는 뜻입니다. showMessage()가 hidden을 false로 바꿔 보여줍니다.
-    role="status"는 상태 안내임을, aria-live="polite"는 내용 변경을 보조 기술이 적절한 시점에 알리도록 지정합니다.
-    메시지 문자열은 JS에서 textContent로 넣으며, 일정 시간이 지나면 다시 숨깁니다.
-  -->
-  <div id="messages" role="status" aria-live="polite" hidden></div>  
-<!--
-  화면 내용을 담는 body를 닫습니다.
--->
+  <div id="messages" role="status" aria-live="polite" hidden></div>
 </body>
-<!--
-  문서 전체를 감싸는 html 요소를 닫습니다.
--->
 </html>
