@@ -1,0 +1,57 @@
+<!doctype html>
+<!-- 표준 HTML 문서로 해석하도록 선언함. 실제 화면 내용은 body에 둠. -->
+<html lang="ko">
+<!-- lang="ko"는 문서의 기본 언어가 한국어임을 알림. -->
+<head>
+  <!-- 한글을 포함한 문자를 UTF-8 인코딩으로 읽음. -->
+  <meta charset="UTF-8">
+  <!-- 화면을 표시할 기준 폭과 초기 배율을 지정함. 배치 자체는 CSS가 정함. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- 검색 서비스 등에 제공할 설명임. 화면의 안내 문장은 series.js가 따로 만듦. -->
+  <meta name="description" content="시리즈 영화를 어떤 순서로 보면 되는지 안내하고 감상 현황을 보여줍니다.">
+  <!-- 브라우저 탭의 초기 제목임. boot()가 series.js에서 넘긴 '시리즈 시청 순서'로 다시 지정하므로 두 값을 같게 맞춤. -->
+  <title>시리즈 시청 순서</title>
+  <!-- 브라우저 탭에 쓰는 아이콘임. -->
+  <link rel="icon" type="image/jpeg" href="assets/favicon.jpg">
+  <!-- 다른 페이지와 같은 공통 CSS를 연결해 글꼴, 메뉴, 버튼 모양을 통일함. -->
+  <link rel="stylesheet" href="css/common.css">
+  <!--
+    시리즈 페이지에만 쓰는 스타일을 별도 파일로 분리함(지도 페이지의 map.css와 같은 방식).
+    common.css 다음에 연결하므로 선택자 명시도가 같으면 series.css 규칙이 적용됨.
+  -->
+  <link rel="stylesheet" href="css/series.css">
+  <!--
+    series.html은 빈 틀이고 실제 본문은 series.js가 만듦.
+    series.js가 시리즈 목록·감상 진행률·다음에 볼 영화 안내·시청 순서 목록을 만듦.
+    type="module"은 import/export를 사용하는 모듈로 실행한다는 뜻임.
+    모듈 스크립트는 HTML 해석이 끝난 뒤 실행되므로 #app 등을 찾을 수 있음.
+  -->
+  <script type="module" src="js/pages/series.js"></script>
+</head>
+<body>
+  <!-- 같은 문서의 id="app" 영역으로 이동하는 링크임. -->
+  <a href="#app" class="skip-link">본문으로 바로가기</a>
+  <!-- ui.js의 mountShell()이 공통 메뉴를 넣을 빈 자리임. 메뉴의 '시리즈'가 이 페이지(series.html)를 가리킴. -->
+  <aside id="sidebar"></aside>
+  <div class="main-wrap">
+    <!-- boot()가 저장 위치 안내를 채우며, #messages도 이곳으로 옮김. -->
+    <header id="topbar"></header>
+    <!--
+      series.js의 renderSeries()가 완성한 요소들을 이 안에 넣음.
+      tabindex="-1"은 Tab 이동 순서에서 빼되 코드로 초점을 줄 수 있게 함.
+    -->
+    <main id="app" tabindex="-1"></main>
+    <footer>
+      <p>&copy; 2026 32조. 팀프로젝트.</p>
+      <p>대표 이메일: teamproject@example.com</p>
+    </footer>
+  </div>
+  <!--
+    showMessage()가 오류 문구를 넣는 자리임. hidden으로 처음에는 숨김.
+    시리즈 페이지는 기록을 읽기만 하므로, 자료를 불러오지 못했을 때의 오류 문구가 주로 표시됨.
+  -->
+  <div id="messages" role="status" aria-live="polite" hidden></div>
+  <!-- JS가 꺼져 있을 때의 안내임. -->
+  <noscript>이 웹사이트는 JavaScript를 켜야 사용할 수 있습니다.</noscript>
+</body>
+</html>

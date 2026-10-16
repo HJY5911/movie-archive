@@ -1,0 +1,182 @@
+.series-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr);
+  gap: 24px;
+  margin-top: 24px;
+  align-items: start;
+}
+
+.series-list-panel,
+.series-detail {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #bbb;
+}
+
+.series-list-panel h2,
+.series-detail h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.series-list {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.series-list li + li {
+  margin-top: 8px;
+}
+
+.series-list button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  border-color: #bbb;
+  text-align: left;
+}
+
+.series-list button[aria-pressed="true"] {
+  border-width: 2px;
+  border-color: currentColor;
+  font-weight: bold;
+}
+
+.series-list-count {
+  white-space: nowrap;
+}
+
+.series-detail .muted {
+  margin: 8px 0 0;
+}
+
+.series-progress-label {
+  margin: 20px 0 8px;
+  font-weight: bold;
+}
+
+.series-progress {
+  height: 12px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.series-progress span {
+  display: block;
+  height: 100%;
+  background: currentColor;
+}
+
+.series-guide {
+  margin-top: 24px;
+  padding: 16px 20px;
+  border: 2px solid currentColor;
+  border-radius: 4px;
+}
+
+.series-guide h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.series-guide p {
+  margin: 0;
+}
+
+.series-guide .series-guide-next a {
+  font-weight: bold;
+}
+
+.series-guide .series-warning {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #aaa;
+}
+
+.series-guide .series-warning::before {
+  content: "⚠ ";
+}
+
+.series-steps-title {
+  margin: 28px 0 12px;
+  font-size: 16px;
+}
+
+.series-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.series-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 0 20px 0;
+}
+
+.series-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 36px;
+  bottom: 0;
+  left: 17px;
+  border-left: 2px dotted #aaa;
+}
+
+.series-step-number {
+  flex: 0 0 36px;
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-weight: bold;
+}
+
+.series-step.watched .series-step-number {
+  border-color: #333;
+  background: #333;
+  color: #fff;
+}
+
+.series-step img {
+  flex: 0 0 72px;
+  width: 72px;
+  height: 104px;
+  object-fit: cover;
+  border: 1px solid #bbb;
+}
+
+.series-step-text {
+  min-width: 0;
+}
+
+.series-step-text h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.series-step-text p {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+.series-step.next img {
+  border: 2px solid currentColor;
+}
+
+.series-next-label {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-size: 12px;
+}
