@@ -253,7 +253,20 @@ function renderSeries(context) {
     detail.append(el('p', { className: 'muted' }, series.description));
   }
 
-  const percent = steps.length === 0 ? 0 : Math.round(watchedCount / steps.length * 100);
+  if (steps.length === 0) {
+    detail.append(
+      el('p', { className: 'empty-state compact' },
+        '이 시리즈에 등록된 작품이 없습니다.')
+    );
+
+    const layout = el('div', { className: 'series-layout' });
+    layout.append(listPanel, detail);
+    app.replaceChildren(heading, layout);
+    return;
+  }
+  
+  const percent = Math.round(watchedCount / steps.length * 100);
+  
   const progressLabel = el('p', { className: 'series-progress-label' }, `${steps.length}편 중 ${watchedCount}편 감상 (${percent}%)`);
   const progressBar = el('div', { className: 'series-progress', role: 'progressbar' });
   progressBar.setAttribute('aria-valuemin', '0');
