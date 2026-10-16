@@ -323,9 +323,23 @@ function renderSeries(context) {
     detail.append(el('p', { className: 'muted' }, series.description));
   }
 
+  // 연결된 영화가 없으면 감상 완료와 구분하여 안내
+  if (steps.length === 0) {
+    detail.append(
+      el('p', { className: 'empty-state compact' },
+        '이 시리즈에 등록된 작품이 없습니다.')
+    );
+
+    const layout = el('div', { className: 'series-layout' });
+    layout.append(listPanel, detail);
+    app.replaceChildren(heading, layout);
+    return;
+  }
+  
   // 진행률 막대: 바깥 div가 틀이고, 안쪽 span의 너비(%)가 채워진 정도임.
   // role="progressbar"와 aria-value 속성으로 화면 읽기 프로그램에도 진행률을 알림.
-  const percent = steps.length === 0 ? 0 : Math.round(watchedCount / steps.length * 100);
+  const percent = Math.round(watchedCount / steps.length * 100);
+
   const progressLabel = el('p', { className: 'series-progress-label' }, `${steps.length}편 중 ${watchedCount}편 감상 (${percent}%)`);
   const progressBar = el('div', { className: 'series-progress', role: 'progressbar' });
   progressBar.setAttribute('aria-valuemin', '0');
