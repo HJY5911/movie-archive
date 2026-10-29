@@ -1,5 +1,6 @@
 import { boot, el } from '../ui.js';
 import { buildProjections } from '../selectors.js';
+import { arrangeMapPins } from '../map-layout.js';
 
 let mode = 'watched';
 let selectedCode = null;
@@ -154,6 +155,12 @@ function renderMap(context) {
   const canvas = el('div', { className: 'map-canvas' });
   const mapImage = el('img', { src: 'assets/world-map.jpg', alt: '제작 국가 핀을 표시하는 세계 지도' });
   canvas.append(mapImage);
+  const svgNamespace = 'http://www.w3.org/2000/svg';
+  const connections = document.createElementNS(svgNamespace, 'svg');
+  connections.setAttribute('class', 'map-connections');
+  connections.setAttribute('aria-hidden', 'true');
+  canvas.append(connections);
+  const pins = [];
 
   for (const entry of ranking) {
     const country = entry.country;
@@ -166,7 +173,8 @@ function renderMap(context) {
       id: pinId,
       type: 'button',
       className: 'map-pin',
-      ariaLabel: `${country.name}, 영화 ${count}편`
+      ariaLabel: `${country.name}, 영화 ${count}편`,
+      title: `${country.name} · ${count}편`
     });
     pin.style.left = position.left + '%';
     pin.style.top = position.top + '%';
@@ -175,8 +183,8 @@ function renderMap(context) {
     const pinHead = el('span', { className: 'map-pin-head' });
     const pinCount = el('span', { className: 'map-pin-count' }, String(count));
     pinHead.append(pinCount);
-    const pinLabel = el('span', { className: 'map-pin-label' }, `${country.name} · ${count}편`);
-    pin.append(pinHead, pinLabel);
+    pin.append(pinHead);
+    pins.push({ code: country.country_code, left: position.left, top: position.top, size, button: pin });
 
     if (country.country_code === selectedCode) {
       pin.classList.add('selected');
@@ -192,9 +200,55 @@ function renderMap(context) {
     canvas.append(pin);
   }
 
+  function positionPins() {
+    let width = Math.max(560, viewport.getBoundingClientRect().width);
+    let positions = arrangeMapPins(pins, width, width / 2);
+    while (positions === null) {
+      width += 80;
+      positions = arrangeMapPins(pins, width, width / 2);
+    }
+    canvas.style.width = width + 'px';
+    connections.setAttribute('viewBox', `0 0 ${width} ${width / 2}`);
+    connections.replaceChildren();
+    for (const position of positions) {
+      const pin = pins.find(item => item.code === position.code);
+      const tipY = position.y + position.size * 0.707;
+      pin.button.style.left = position.x + 'px';
+      pin.button.style.top = tipY + 'px';
+      if (Math.hypot(position.x - position.anchorX, tipY - position.anchorY) < 1) continue;
+      const line = document.createElementNS(svgNamespace, 'line');
+      line.setAttribute('x1', position.anchorX);
+      line.setAttribute('y1', position.anchorY);
+      line.setAttribute('x2', position.x);
+      line.setAttribute('y2', tipY);
+      const dot = document.createElementNS(svgNamespace, 'circle');
+      dot.setAttribute('cx', position.anchorX);
+      dot.setAttribute('cy', position.anchorY);
+      dot.setAttribute('r', '2.5');
+      if (position.code === selectedCode) {
+        line.classList.add('selected');
+        dot.classList.add('selected');
+      }
+      connections.append(line, dot);
+    }
+  }
+
+  function observeMap() {
+    positionPins();
+    const observer = new ResizeObserver(positionPins);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }
+
+  const viewport = el('div', { className: 'map-viewport', tabIndex: 0, role: 'region', ariaLabel: '세계 지도. 좁은 화면에서는 좌우로 스크롤할 수 있습니다.' });
+  viewport.append(canvas);
   const mapPanel = el('section', { className: 'map-panel' });
   const mapTitle = el('h2', {}, '세계 지도');
-  mapPanel.append(mapTitle, toolbar, canvas);
+  const mapHelp = el('p', { className: 'map-help' }, '가까운 핀은 펼쳐서 표시합니다. 연결선 끝의 점이 실제 국가 위치입니다. 지도가 잘리면 좌우로 스크롤하세요.');
+  mapPanel.append(mapTitle, toolbar, viewport, mapHelp);
+  if (selectedEntry !== null) {
+    mapPanel.append(el('p', { className: 'map-selection', ariaLive: 'polite' }, `선택한 국가: ${selectedEntry.country.name} · ${selectedEntry.movie_ids.length}편`));
+  }
 
   if (ranking.length === 0 && mode === 'watched') {
     const empty = el('div', { className: 'empty-state' });
@@ -215,7 +269,7 @@ function renderMap(context) {
   if (selectedEntry === null) {
     layout.classList.add('single');
     app.replaceChildren(heading, layout);
-    return;
+    return observeMap();
   }
 
   const countryPanel = el('section', { className: 'map-country-panel' });
@@ -295,6 +349,7 @@ function renderMap(context) {
   layout.append(side);
 
   app.replaceChildren(heading, layout);
+  return observeMap();
 }
 
 boot({

@@ -25,6 +25,8 @@ import { boot, el } from '../ui.js';
 // 이 페이지는 그중 국가 코드별 감상 영화 ID 목록인 country_movies만 사용함.
 import { buildProjections } from '../selectors.js';
 
+import { arrangeMapPins } from '../map-layout.js';
+
 // mode는 지도에 표시할 영화의 기준임. 'watched'는 감상한 영화, 'all'은 등록된 전체 영화임.
 // let은 나중에 값을 다시 대입할 수 있는 변수임. 처음 열면 감상한 영화 기준으로 보여줌.
 let mode = 'watched';
@@ -349,7 +351,7 @@ function renderMap(context) {
   // 결과: toolbar(div) → [modeSwitch(div), summary(p)].
   toolbar.append(modeSwitch, summary);
 
-  // canvas는 지도 이미지와 핀들을 겹쳐 놓을 div임. map.css에서 핀 위치(%)의 기준 상자가 됨.
+  // canvas는 지도 이미지·연결선·핀을 담는 div임. 최종 핀 위치(px)의 기준 상자가 됨.
   const canvas = el('div', { className: 'map-canvas' });
   // 정방형 도법 세계 지도 이미지임. src 경로는 이 JS 파일이 아니라 map.html의 위치를 기준으로 해석됨.
   // alt는 이미지를 볼 수 없을 때 대신 전달되는 설명임.
@@ -357,6 +359,13 @@ function renderMap(context) {
   // 이미지를 canvas의 첫 자식으로 넣음. 핀들은 아래 반복문에서 이미지 뒤에 붙음.
   // 핀이 이미지 위에 겹쳐 보이는 것은 map.css가 핀에 position: absolute를 지정했기 때문이며 DOM 순서 때문이 아님.
   canvas.append(mapImage);
+
+  const svgNamespace = 'http://www.w3.org/2000/svg';
+  const connections = document.createElementNS(svgNamespace, 'svg');
+  connections.setAttribute('class', 'map-connections');
+  connections.setAttribute('aria-hidden', 'true');
+  canvas.append(connections);
+  const pins = [];
 
   // 순위에 들어간 국가마다 핀 버튼 하나를 만듦.
   for (const entry of ranking) {
@@ -381,13 +390,14 @@ function renderMap(context) {
       // map.css의 '.map-canvas .map-pin' 규칙이 공통 버튼의 테두리·여백·최소 크기를 지워 --size 크기의 투명한 상자로 만듦.
       // 눈에 보이는 핀 모양은 안쪽의 map-pin-head가 그림.
       className: 'map-pin',
-      // 핀 안에는 숫자만 보이므로 국가 이름과 영화 수를 한 문장으로 보조 기술에 알려줌.
-      ariaLabel: `${country.name}, 영화 ${count}편`
+
+      ariaLabel: `${country.name}, 영화 ${count}편`,
+      title: `${country.name} · ${count}편`
     });
     // style.left는 요소에 직접 넣는 인라인 스타일임. 숫자 뒤에 '%'를 붙여 '85.5%' 같은 CSS 값을 만듦.
     // map.css의 position: absolute와 함께 canvas 왼쪽 끝에서의 거리를 정함.
     pin.style.left = position.left + '%';
-    // 위쪽 끝에서의 거리도 같은 방법으로 지정함. %이므로 지도 크기가 바뀌어도 핀이 같은 지점에 머무름.
+    // 초기 좌표를 지정함. 화면에 붙인 뒤 positionPins()가 겹침 없는 픽셀 좌표로 다시 배치함.
     // left/top은 상자의 왼쪽 위 모서리를 이 좌표에 놓음. 뾰족한 끝을 좌표에 맞추는 일은 map.css가 담당함.
     // map.css의 translate(-50%, -120.7%)가 상자를 너비의 절반만큼 왼쪽, 높이의 120.7%만큼 위로 옮김.
     pin.style.top = position.top + '%';
@@ -404,18 +414,16 @@ function renderMap(context) {
     const pinCount = el('span', { className: 'map-pin-count' }, String(count));
     // 결과: pinHead(span) → pinCount(span).
     pinHead.append(pinCount);
-    // 핀 아래에 뜨는 이름표임. 예: '대한민국 · 3편'.
-    // map.css가 평소에는 숨기고 마우스를 올렸을 때·키보드 초점·선택 상태에서만 보여줌.
-    const pinLabel = el('span', { className: 'map-pin-label' }, `${country.name} · ${count}편`);
-    // 결과: pin(button) → [pinHead(span), pinLabel(span)].
-    pin.append(pinHead, pinLabel);
+
+    pin.append(pinHead);
+    pins.push({ code: country.country_code, left: position.left, top: position.top, size, button: pin });
 
     // 이번 국가가 선택된 국가인지 확인해 선택 상태를 표시함.
     if (country.country_code === selectedCode) {
       // classList.add는 기존 클래스를 지우지 않고 클래스 이름 하나를 추가함.
       // selected는 선택한 핀을 구분하는 클래스임. 현재 map.css의 강조는 aria-pressed="true"를 기준으로 함.
       pin.classList.add('selected');
-      // 선택 상태를 CSS와 보조 기술에 모두 전달함. map.css는 이 핀 머리의 테두리를 두껍게, 크기를 조금 크게 하고 이름표를 보여줌.
+      // 선택 상태를 CSS와 보조 기술에 모두 전달함. map.css는 이 핀 머리의 테두리를 두껍게, 크기를 조금 크게 함. 국가 이름은 지도 아래 선택 문구와 버튼 title로 확인함.
       pin.setAttribute('aria-pressed', 'true');
     } else {
       // 선택하지 않은 나머지 핀도 상태를 명시하여 '선택 안 됨'으로 표시함.
@@ -436,12 +444,60 @@ function renderMap(context) {
     canvas.append(pin);
   }
 
+  // 실제 좌표는 유지하고, 회전·확대된 핀이 겹치지 않는 가까운 빈 자리로 표시 위치를 옮김.
+  // 지도 영역이 너무 좁으면 지도 자체를 넓히고 해당 영역만 가로 스크롤하도록 함.
+  function positionPins() {
+    let width = Math.max(560, viewport.getBoundingClientRect().width);
+    let positions = arrangeMapPins(pins, width, width / 2);
+    while (positions === null) {
+      width += 80;
+      positions = arrangeMapPins(pins, width, width / 2);
+    }
+    canvas.style.width = width + 'px';
+    connections.setAttribute('viewBox', `0 0 ${width} ${width / 2}`);
+    connections.replaceChildren();
+    for (const position of positions) {
+      const pin = pins.find(item => item.code === position.code);
+      const tipY = position.y + position.size * 0.707;
+      pin.button.style.left = position.x + 'px';
+      pin.button.style.top = tipY + 'px';
+      if (Math.hypot(position.x - position.anchorX, tipY - position.anchorY) < 1) continue;
+      const line = document.createElementNS(svgNamespace, 'line');
+      line.setAttribute('x1', position.anchorX);
+      line.setAttribute('y1', position.anchorY);
+      line.setAttribute('x2', position.x);
+      line.setAttribute('y2', tipY);
+      const dot = document.createElementNS(svgNamespace, 'circle');
+      dot.setAttribute('cx', position.anchorX);
+      dot.setAttribute('cy', position.anchorY);
+      dot.setAttribute('r', '2.5');
+      if (position.code === selectedCode) {
+        line.classList.add('selected');
+        dot.classList.add('selected');
+      }
+      connections.append(line, dot);
+    }
+  }
+  // 화면 폭이 바뀔 때 다시 배치하며, boot의 화면 정리 함수에서 관찰을 해제함.
+  function observeMap() {
+    positionPins();
+    const observer = new ResizeObserver(positionPins);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }
+  const viewport = el('div', { className: 'map-viewport', tabIndex: 0, role: 'region', ariaLabel: '세계 지도. 좁은 화면에서는 좌우로 스크롤할 수 있습니다.' });
+  viewport.append(canvas);
+
   // 지도 영역 전체를 담을 section임.
   const mapPanel = el('section', { className: 'map-panel' });
   // 지도 영역의 소제목 h2임.
   const mapTitle = el('h2', {}, '세계 지도');
-  // 결과: mapPanel(section) → [mapTitle(h2), toolbar(div), canvas(div)].
-  mapPanel.append(mapTitle, toolbar, canvas);
+
+  const mapHelp = el('p', { className: 'map-help' }, '가까운 핀은 펼쳐서 표시합니다. 연결선 끝의 점이 실제 국가 위치입니다. 지도가 잘리면 좌우로 스크롤하세요.');
+  mapPanel.append(mapTitle, toolbar, viewport, mapHelp);
+  if (selectedEntry !== null) {
+    mapPanel.append(el('p', { className: 'map-selection', ariaLive: 'polite' }, `선택한 국가: ${selectedEntry.country.name} · ${selectedEntry.movie_ids.length}편`));
+  }
 
   // 감상한 영화 모드에서 핀이 하나도 없으면(주로 감상 기록이 아직 없을 때) 다음 행동을 안내함.
   if (ranking.length === 0 && mode === 'watched') {
@@ -477,8 +533,8 @@ function renderMap(context) {
     layout.classList.add('single');
     // 제목과 지도 영역만으로 본문을 교체함.
     app.replaceChildren(heading, layout);
-    // return으로 renderMap을 여기서 끝냄. 아래의 국가별 영화 목록과 순위는 만들지 않음.
-    return;
+
+    return observeMap();
   }
 
   // 선택한 국가의 영화 목록을 담을 section임.
@@ -621,6 +677,8 @@ function renderMap(context) {
   // replaceChildren은 app 자체는 유지하고 기존 본문 자식만 새 요소들로 교체함.
   // 로딩 표시 또는 이전 지도 화면이 사라지고 새 화면이 나타남. DB의 기록은 삭제하지 않음.
   app.replaceChildren(heading, layout);
+
+  return observeMap();
 }
 
 // 준비 함수에 화면을 그릴 함수의 이름을 전달함. renderMap()으로 즉시 호출하지 않음.

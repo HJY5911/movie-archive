@@ -56,9 +56,51 @@
   margin: 0;
 }
 
+.map-viewport {
+  overflow-x: auto;
+  padding: 8px 0;
+}
+
 .map-canvas {
   position: relative;
-  margin-top: 32px;
+  min-width: 560px;
+  aspect-ratio: 2 / 1;
+}
+
+.map-help,
+.map-selection {
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+
+.map-selection {
+  font-weight: bold;
+}
+
+.map-connections {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.map-connections line {
+  stroke: #777;
+  stroke-width: 1;
+}
+
+.map-connections circle {
+  fill: #777;
+}
+
+.map-connections line.selected {
+  stroke: #111;
+  stroke-width: 2;
+}
+
+.map-connections circle.selected {
+  fill: #111;
 }
 
 .map-canvas img {
@@ -102,27 +144,6 @@
 .map-canvas .map-pin[aria-pressed="true"] .map-pin-head {
   border-width: 3px;
   transform: rotate(-45deg) scale(1.15);
-}
-
-.map-pin-label {
-  position: absolute;
-  top: calc(120.7% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 2px 8px;
-  border: 1px solid currentColor;
-  border-radius: 4px;
-  background: #fff;
-  font-size: 12px;
-  white-space: nowrap;
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.map-canvas .map-pin:hover .map-pin-label,
-.map-canvas .map-pin:focus-visible .map-pin-label,
-.map-canvas .map-pin[aria-pressed="true"] .map-pin-label {
-  visibility: visible;
 }
 
 .map-canvas .map-pin:hover,
