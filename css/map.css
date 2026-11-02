@@ -66,10 +66,49 @@
   font-size: 0.875rem;
 }
 
+.map-viewport {
+  overflow-x: auto;
+  padding: 8px 0;
+}
+
 .map-canvas {
   position: relative;
-  margin-top: 48px;
+  min-width: 560px;
+  aspect-ratio: 2 / 1;
+  margin-top: 16px;
   cursor: crosshair;
+}
+
+.map-help {
+  margin: 12px 0 0;
+  color: var(--color-gray-700);
+  font-size: 0.8125rem;
+}
+
+.map-connections {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.map-connections line {
+  stroke: var(--color-gray-500);
+  stroke-width: 1;
+}
+
+.map-connections circle {
+  fill: var(--color-gray-500);
+}
+
+.map-connections line.selected {
+  stroke: var(--color-ink);
+  stroke-width: 2;
+}
+
+.map-connections circle.selected {
+  fill: var(--color-ink);
 }
 
 .map-canvas img {
@@ -95,28 +134,12 @@
   pointer-events: none;
   transform: translate(-50%, -120.7%);
   --map-pin-size: 30px;
-  --map-lean: 0deg;
-  --map-lean-x: 0%;
-  --map-lean-y: 0%;
-}
-
-.map-canvas .map-pin-west {
-  --map-lean: -35deg;
-  --map-lean-x: -40.6%;
-  --map-lean-y: 12.8%;
-}
-
-.map-canvas .map-pin-east {
-  --map-lean: 35deg;
-  --map-lean-x: 40.6%;
-  --map-lean-y: 12.8%;
 }
 
 .map-pin-head {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  transform: translate(var(--map-lean-x), var(--map-lean-y));
 }
 
 .map-pin-head::before {
@@ -127,12 +150,12 @@
   border-radius: 50% 50% 50% 0;
   background: radial-gradient(circle closest-side, var(--color-ink) 30%, transparent 35%) var(--color-orange);
   pointer-events: auto;
-  transform: rotate(calc(var(--map-lean) - 45deg));
+  transform: rotate(-45deg);
 }
 
 .map-canvas .map-pin:hover .map-pin-head,
 .map-canvas .map-pin[aria-pressed="true"] .map-pin-head {
-  transform: translate(var(--map-lean-x), var(--map-lean-y)) scale(1.15);
+  transform: scale(1.15);
 }
 
 .map-canvas .map-pin[aria-pressed="true"] .map-pin-head::before {
@@ -294,10 +317,6 @@
 }
 
 @media (max-width: 575.98px) {
-  .map-canvas {
-    margin-top: 40px;
-  }
-
   .map-canvas .map-pin {
     --map-pin-size: 24px;
   }

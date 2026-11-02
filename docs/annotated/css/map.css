@@ -87,12 +87,57 @@
   font-size: 0.875rem;
 }
 
-/* 핀의 기준 상자임. 위도가 높은 핀은 위로 솟으므로 위쪽 여백을 넉넉히 둠. */
+/* 지도를 감싸는 상자임. 좁은 화면에서 지도가 최소 너비(560px)보다 넓어지면 이 상자 안에서만 가로 스크롤됨. */
+.map-viewport {
+  overflow-x: auto;
+  padding: 8px 0;
+}
+
+/* 핀의 기준 상자임. map.js가 핀이 겹치지 않도록 너비를 정하고, 높이는 지도 그림과 같은 2:1 비율로 맞춤. */
+/* map-layout.js가 핀을 지도 안쪽에 두므로 위쪽 여백은 작게 둠. */
 .map-canvas {
   position: relative;
-  margin-top: 48px;
+  min-width: 560px;
+  aspect-ratio: 2 / 1;
+  margin-top: 16px;
   /* 지도 위에서는 십자 모양 커서를 기본으로 씀. 조준선이 켜지지 않는 환경(스크립트 꺼짐 등)에서도 위치를 고르는 곳임을 알 수 있음. */
   cursor: crosshair;
+}
+
+/* 지도 아래의 짧은 도움말임. 핀을 펼쳐 표시한다는 것과 가로 스크롤을 안내함. */
+.map-help {
+  margin: 12px 0 0;
+  color: var(--color-gray-700);
+  font-size: 0.8125rem;
+}
+
+/* 옮겨진 핀과 실제 국가 위치를 잇는 선을 그리는 svg임. 지도와 같은 크기로 겹치고 마우스는 받지 않음. */
+.map-connections {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* 연결선과 실제 위치 점은 회색으로 흐리게 그림. */
+.map-connections line {
+  stroke: var(--color-gray-500);
+  stroke-width: 1;
+}
+
+.map-connections circle {
+  fill: var(--color-gray-500);
+}
+
+/* 선택된 국가의 연결선과 점은 검정·굵게 그림. */
+.map-connections line.selected {
+  stroke: var(--color-ink);
+  stroke-width: 2;
+}
+
+.map-connections circle.selected {
+  fill: var(--color-ink);
 }
 
 /*
@@ -128,7 +173,6 @@
   z-index: 1;
   cursor: pointer;
   /* 투명한 버튼 상자는 마우스를 받지 않게 함. 마우스는 아래 .map-pin-head::before(pointer-events: auto)만 받음. */
-  /* 핀 머리를 기울이면 머리와 상자 위치가 어긋나므로, 이웃 핀의 투명한 상자가 기울어진 머리의 클릭을 가로채지 않게 하려는 것임. */
   /* 머리에서 일어난 클릭은 부모인 이 버튼으로 전달되므로 map.js의 클릭 함수는 그대로 실행됨. Tab 키 초점도 그대로 받음. */
   pointer-events: none;
   /* translate의 퍼센트는 핀 자기 크기 기준임. 왼쪽으로 너비의 50%, 위로 높이의 120.7%만큼 옮김. */
@@ -137,27 +181,6 @@
   /* 모든 핀이 함께 쓰는 한 변의 길이임. 휴대폰 너비에서는 맨 아래 @media 규칙이 24px로 바꿈. */
   /* 사용자 정의 속성은 같은 규칙의 width·height에서도 바로 읽을 수 있음. */
   --map-pin-size: 30px;
-  /* 핀 머리를 기울일 각도와, 기울일 때 머리를 옮길 가로·세로 거리임. 기본은 모두 0이라 똑바로 섬. */
-  /* 아래 map-pin-west·map-pin-east가 값을 바꾸고, 사용자 정의 속성은 자식에게 상속되므로 .map-pin-head가 같은 값을 읽음. */
-  --map-lean: 0deg;
-  --map-lean-x: 0%;
-  --map-lean-y: 0%;
-}
-
-/* map.js가 가까이 붙은 핀 중 서쪽 핀에 붙이는 클래스임. 머리를 왼쪽으로 35도 기울임. 예: 대한민국과 일본 중 대한민국. */
-/* 옮길 거리 -40.6%·12.8%의 근거는 아래 물방울 모양 설명에 있음. */
-.map-canvas .map-pin-west {
-  --map-lean: -35deg;
-  --map-lean-x: -40.6%;
-  --map-lean-y: 12.8%;
-}
-
-/* 가까이 붙은 핀 중 동쪽 핀임. 머리를 오른쪽으로 35도 기울임. rotate는 양수가 시계 방향임. */
-/* 서쪽 핀과 좌우만 바뀌므로 가로 거리의 부호만 반대임. */
-.map-canvas .map-pin-east {
-  --map-lean: 35deg;
-  --map-lean-x: 40.6%;
-  --map-lean-y: 12.8%;
 }
 
 /*
@@ -165,14 +188,12 @@
  * 이 span 자체는 회전하지 않음. 그래서 getBoundingClientRect()로 잰 크기가 둥근 머리와 같음.
  * 지도 조준선(crosshair.js)은 이 크기에 사방 6px 여백을 더해 주황 잠금 상자를 그리므로, 상자가 핀 머리를 꼭 맞게 감쌈.
  * 눈에 보이는 물방울 모양과 가운데 점은 아래 ::before가 그림.
- * 기울인 핀도 span은 회전하지 않고 translate로 옮기기만 함. 옮기는 거리의 근거는 아래 물방울 모양 설명에 있음.
  */
 .map-pin-head {
   position: absolute;
   inset: 0;
   /* span 상자는 마우스를 받지 않음. 둥근 머리 바깥 네 귀퉁이는 클릭되지 않고, 물방울 모양의 ::before만 마우스를 받음. */
   pointer-events: none;
-  transform: translate(var(--map-lean-x), var(--map-lean-y));
 }
 
 /*
@@ -182,11 +203,6 @@
  * 회전 기준점은 기본값인 가운데라 둥근 부분은 그대로이고, 끝점은 중심에서 대각선의 절반만큼 아래에 옴.
  * 대각선의 절반은 한 변 × √2/2 ≈ 0.707이고, 중심은 상자 위쪽 변에서 높이의 0.5만큼 아래임.
  * 따라서 끝점은 상자 위쪽 변에서 높이의 0.5 + 0.707 ≈ 1.207배 아래이며, 이것이 -120.7%의 근거임.
- * 기울인 핀은 -45도에 --map-lean만큼 더 돌려 끝점 방향을 바꿈. 그러면 끝점이 좌표에서 벗어나므로 머리 span을 옮겨 되돌림.
- * 한 변을 1로 보면, 서쪽 핀(-35도)의 끝점은 중심에서 오른쪽으로 0.707 × sin35° ≈ 0.406, 아래로 0.707 × cos35° ≈ 0.579만큼 떨어짐.
- * 끝점이 원래 자리(중심에서 아래로 0.707)에 오려면 중심을 왼쪽으로 0.406, 아래로 0.707 - 0.579 ≈ 0.128만큼 옮겨야 함.
- * 이것이 --map-lean-x: -40.6%, --map-lean-y: 12.8%의 근거임. translate의 퍼센트는 머리 span 자기 크기(한 변) 기준임.
- * 결과적으로 머리는 기울어도 뾰족한 끝은 원래 좌표에 그대로 남음.
  */
 .map-pin-head::before {
   content: "";
@@ -203,15 +219,13 @@
   /* 부모 버튼과 머리 span은 pointer-events: none이므로, 눈에 보이는 물방울만 마우스를 받게 다시 켬. */
   /* ::before 위의 마우스 이벤트는 머리 span에서 일어난 것으로 처리되어 :hover와 클릭이 그대로 동작함. */
   pointer-events: auto;
-  /* calc(var(--map-lean) - 45deg)의 예: 똑바른 핀은 -45도, 서쪽 핀은 -80도, 동쪽 핀은 -10도를 돌림. */
-  transform: rotate(calc(var(--map-lean) - 45deg));
+  transform: rotate(-45deg);
 }
 
 /* 마우스를 올린 핀과 선택된 핀(aria-pressed="true")은 조금 크게 보여줌. */
-/* transform은 값 전체가 바뀌므로 기울일 때 옮기는 translate도 다시 적음. 확대는 둥근 머리의 가운데를 기준으로 함. */
 .map-canvas .map-pin:hover .map-pin-head,
 .map-canvas .map-pin[aria-pressed="true"] .map-pin-head {
-  transform: translate(var(--map-lean-x), var(--map-lean-y)) scale(1.15);
+  transform: scale(1.15);
 }
 
 /* 선택된 핀: 검은 바탕 + 주황 점 + 확대로 표시함. 아래 이름표도 계속 보임. 점 크기는 평소 핀과 같음. */
@@ -267,7 +281,7 @@
 }
 
 /* 키보드 초점 표시는 투명한 버튼 상자 대신 눈에 보이는 물방울(.map-pin-head::before) 둘레에 그림. */
-/* 기울어진 핀은 상자와 머리 위치가 달라서, 상자에 그리면 엉뚱한 자리에 네모가 생기기 때문임. */
+/* 투명한 버튼 상자에 그리면 물방울이 아닌 네모난 선이 생기기 때문임. */
 .map-canvas .map-pin:focus-visible {
   outline: none;
 }
@@ -417,10 +431,6 @@
 
 /* 휴대폰 너비에서는 지도가 작아지므로 핀 크기를 24px로 줄임. */
 @media (max-width: 575.98px) {
-  .map-canvas {
-    margin-top: 40px;
-  }
-
   /* 크기 변수 하나만 바꾸면 핀 버튼·머리·물방울·가운데 점·이름표 위치가 모두 함께 줄어듦. */
   /* 24px는 손가락으로 누르는 대상의 최소 크기로 흔히 권장하는 24×24px에 맞춘 값임. */
   .map-canvas .map-pin {

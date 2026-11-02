@@ -30,6 +30,8 @@ import { buildProjections } from '../selectors.js';
 // React Bits의 Crosshair를 순수 JavaScript로 옮긴 모듈이며, 자세한 설명은 docs/annotated/js/effects/crosshair.js에 있음.
 import { createCrosshair } from '../effects/crosshair.js';
 
+import { arrangeMapPins } from '../map-layout.js';
+
 // mode는 지도에 표시할 영화의 기준임. 'watched'는 감상한 영화, 'all'은 등록된 전체 영화임.
 // let은 나중에 값을 다시 대입할 수 있는 변수임. 처음 열면 감상한 영화 기준으로 보여줌.
 let mode = 'watched';
@@ -478,7 +480,7 @@ function renderMap(context) {
   // 결과: toolbar(div) → [modeSwitch(div), summary(p)].
   toolbar.append(modeSwitch, summary);
 
-  // canvas는 지도 이미지와 핀들을 겹쳐 놓을 div임. map.css에서 핀 위치(%)의 기준 상자가 됨.
+  // canvas는 지도 이미지·연결선·핀을 담는 div임. 최종 핀 위치(px)의 기준 상자가 됨.
   const canvas = el('div', { className: 'map-canvas' });
   // 정방형 도법 세계 지도 이미지임. src 경로는 이 JS 파일이 아니라 map.html의 위치를 기준으로 해석됨.
   // alt는 이미지를 볼 수 없을 때 대신 전달되는 설명임.
@@ -487,27 +489,16 @@ function renderMap(context) {
   // 핀이 이미지 위에 겹쳐 보이는 것은 map.css가 핀에 position: absolute를 지정했기 때문이며 DOM 순서 때문이 아님.
   canvas.append(mapImage);
 
-  // 가까이 붙은 국가의 핀이 서로 가리지 않도록, 핀 머리를 기울일 국가를 미리 고름.
-  // 예: 대한민국(경도 127.8)과 일본(경도 138.3)은 경도 차이가 10.5도뿐이라 휴대폰 너비 지도에서는 약 10px 거리임.
-  // 이때 서쪽 핀(대한민국)은 왼쪽으로, 동쪽 핀(일본)은 오른쪽으로 머리를 기울임. 뾰족한 끝은 원래 좌표에 그대로 둠.
-  // leanWest는 왼쪽으로 기울일 국가 코드, leanEast는 오른쪽으로 기울일 국가 코드를 담는 Set임.
-  const leanWest = new Set();
-  const leanEast = new Set();
-  // 국가 두 개씩 모든 짝을 비교함. west는 서쪽 후보, east는 동쪽 후보임.
-  for (const west of ranking) {
-    for (const east of ranking) {
-      // 경도 차이임. 양수이면 east가 west보다 동쪽(지도에서 오른쪽)에 있음.
-      const lngGap = east.country.pin_lng - west.country.pin_lng;
-      // 위도 차이의 크기임. Math.abs는 음수를 양수로 바꿔 절댓값을 돌려줌.
-      const latGap = Math.abs(east.country.pin_lat - west.country.pin_lat);
-      // 동쪽으로 20도 미만, 위아래로 15도 미만이면 가까운 핀으로 봄.
-      // lngGap > 0 조건 때문에 같은 국가끼리의 비교(차이 0)와 반대 방향 짝은 건너뜀.
-      if (lngGap > 0 && lngGap < 20 && latGap < 15) {
-        leanWest.add(west.country.country_code);
-        leanEast.add(east.country.country_code);
-      }
-    }
-  }
+  // 연결선을 그릴 SVG의 이름공간 주소임. SVG 요소는 createElement가 아니라 createElementNS로 만들어야 함.
+  const svgNamespace = 'http://www.w3.org/2000/svg';
+  // 핀을 옮겼을 때 실제 국가 위치와 핀을 잇는 선을 담는 svg임. 보조 기술에는 읽히지 않게 숨김.
+  const connections = document.createElementNS(svgNamespace, 'svg');
+  connections.setAttribute('class', 'map-connections');
+  connections.setAttribute('aria-hidden', 'true');
+  canvas.append(connections);
+  // pins는 map-layout.js에 넘길 핀 정보 배열임. pinByCode는 같은 정보를 국가 코드로 바로 찾기 위한 객체임.
+  const pins = [];
+  const pinByCode = {};
 
   // 순위에 들어간 국가마다 핀 버튼 하나를 만듦.
   for (const entry of ranking) {
@@ -536,19 +527,10 @@ function renderMap(context) {
     // style.left는 요소에 직접 넣는 인라인 스타일임. 숫자 뒤에 '%'를 붙여 '85.5%' 같은 CSS 값을 만듦.
     // map.css의 position: absolute와 함께 canvas 왼쪽 끝에서의 거리를 정함.
     pin.style.left = position.left + '%';
-    // 위쪽 끝에서의 거리도 같은 방법으로 지정함. %이므로 지도 크기가 바뀌어도 핀이 같은 지점에 머무름.
+    // 초기 좌표를 지정함. 화면에 붙인 뒤 positionPins()가 겹침 없는 픽셀 좌표로 다시 배치함.
     // left/top은 상자의 왼쪽 위 모서리를 이 좌표에 놓음. 뾰족한 끝을 좌표에 맞추는 일은 map.css가 담당함.
     // map.css의 translate(-50%, -120.7%)가 상자를 너비의 절반만큼 왼쪽, 높이의 120.7%만큼 위로 옮김.
     pin.style.top = position.top + '%';
-    // 서쪽 이웃만 있는 핀은 오른쪽(map-pin-east), 동쪽 이웃만 있는 핀은 왼쪽(map-pin-west)으로 기울임.
-    // 양쪽에 모두 이웃이 있는 가운데 핀은 똑바로 둠. !는 참·거짓을 뒤집는 연산자임.
-    // 실제 기울이기는 map.css가 --map-lean·--map-lean-x·--map-lean-y 값으로 처리함.
-    if (leanWest.has(country.country_code) && !leanEast.has(country.country_code)) {
-      pin.classList.add('map-pin-west');
-    }
-    if (leanEast.has(country.country_code) && !leanWest.has(country.country_code)) {
-      pin.classList.add('map-pin-east');
-    }
 
     // pinHead는 핀 머리임. 안에 글자나 자식 요소 없이 빈 span으로 둠.
     // 물방울 모양과 가운데의 둥근 점은 map.css가 ::before로 그림. 정사각형을 -45도 돌려 뾰족한 모서리가 아래를 향하게 함.
@@ -558,6 +540,10 @@ function renderMap(context) {
     const pinLabel = el('span', { className: 'map-pin-label' }, `${country.name} · ${count}편`);
     // 결과: pin(button) → [pinHead(span), pinLabel(span)].
     pin.append(pinHead, pinLabel);
+    // 겹침 계산에 쓸 핀 정보임. size는 화면에 붙인 뒤 positionPins()가 실제 핀 너비로 채움.
+    const pinInfo = { code: country.country_code, left: position.left, top: position.top, size: 0, button: pin };
+    pins.push(pinInfo);
+    pinByCode[country.country_code] = pinInfo;
 
     // 이번 국가가 선택된 국가인지 확인해 선택 상태를 표시함.
     if (country.country_code === selectedCode) {
@@ -585,12 +571,74 @@ function renderMap(context) {
     canvas.append(pin);
   }
 
+  // 실제 좌표는 유지하고, 회전·확대된 핀이 겹치지 않는 가까운 빈 자리로 표시 위치를 옮김.
+  // 지도 영역이 너무 좁으면 지도 자체를 넓히고 해당 영역만 가로 스크롤하도록 함.
+  function positionPins() {
+    let width = Math.max(560, viewport.getBoundingClientRect().width);
+    // 핀 크기는 map.css의 --map-pin-size(30px, 좁은 화면 24px)를 따르므로 화면에 그려진 너비를 그대로 읽음.
+    for (const pin of pins) {
+      pin.size = pin.button.offsetWidth;
+    }
+    let positions = arrangeMapPins(pins, width, width / 2);
+    while (positions === null) {
+      width += 80;
+      positions = arrangeMapPins(pins, width, width / 2);
+    }
+    canvas.style.width = width + 'px';
+    connections.setAttribute('viewBox', '0 0 ' + width + ' ' + width / 2);
+    connections.replaceChildren();
+    for (const position of positions) {
+      const pin = pinByCode[position.code];
+      const tipY = position.y + position.size * 0.707;
+      pin.button.style.left = position.x + 'px';
+      pin.button.style.top = tipY + 'px';
+      // 거의 옮기지 않은 핀(1px 미만)은 연결선을 그리지 않음.
+      if (Math.hypot(position.x - position.anchorX, tipY - position.anchorY) < 1) {
+        continue;
+      }
+      const line = document.createElementNS(svgNamespace, 'line');
+      line.setAttribute('x1', position.anchorX);
+      line.setAttribute('y1', position.anchorY);
+      line.setAttribute('x2', position.x);
+      line.setAttribute('y2', tipY);
+      const dot = document.createElementNS(svgNamespace, 'circle');
+      dot.setAttribute('cx', position.anchorX);
+      dot.setAttribute('cy', position.anchorY);
+      dot.setAttribute('r', '2.5');
+      if (position.code === selectedCode) {
+        line.classList.add('selected');
+        dot.classList.add('selected');
+      }
+      connections.append(line, dot);
+    }
+  }
+  // 핀을 배치하고, 화면 폭이 바뀔 때 다시 배치하며, 조준선도 켬.
+  // boot는 다음 그리기 전에 반환한 정리 함수를 부르므로, 관찰 해제와 조준선 정리를 한 함수로 묶음.
+  function startMapEffects() {
+    positionPins();
+    const observer = new ResizeObserver(positionPins);
+    observer.observe(viewport);
+    const stopCrosshair = startCrosshair(canvas);
+
+    function stopMapEffects() {
+      observer.disconnect();
+      // 터치 화면에서는 조준선을 만들지 않아 stopCrosshair가 undefined임.
+      if (stopCrosshair !== undefined) {
+        stopCrosshair();
+      }
+    }
+    return stopMapEffects;
+  }
+  const viewport = el('div', { className: 'map-viewport', tabIndex: 0, role: 'region', ariaLabel: '세계 지도. 좁은 화면에서는 좌우로 스크롤할 수 있습니다.' });
+  viewport.append(canvas);
+
   // 지도 영역 전체를 담을 section임.
   const mapPanel = el('section', { className: 'map-panel' });
   // 지도 영역의 소제목 h2임.
   const mapTitle = el('h2', {}, '세계 지도');
-  // 결과: mapPanel(section) → [mapTitle(h2), toolbar(div), canvas(div)].
-  mapPanel.append(mapTitle, toolbar, canvas);
+
+  const mapHelp = el('p', { className: 'map-help' }, '가까운 핀은 펼쳐서 표시합니다. 연결선 끝의 점이 실제 국가 위치입니다. 지도가 잘리면 좌우로 스크롤하세요.');
+  mapPanel.append(mapTitle, toolbar, viewport, mapHelp);
 
   // 감상한 영화 모드에서 핀이 하나도 없으면(주로 감상 기록이 아직 없을 때) 다음 행동을 안내함.
   if (ranking.length === 0 && mode === 'watched') {
@@ -629,7 +677,7 @@ function renderMap(context) {
     // return으로 renderMap을 여기서 끝냄. 아래의 국가별 영화 목록과 순위는 만들지 않음.
     // 지도는 화면에 있으므로 조준선은 만들고, 조준선을 지우는 함수를 반환함.
     // 화면에 붙인 뒤에 만들어야 지도 크기와 마우스 위치를 바로 잴 수 있음.
-    return startCrosshair(canvas);
+    return startMapEffects();
   }
 
   // 선택한 국가의 영화 목록을 담을 section임.
@@ -773,7 +821,7 @@ function renderMap(context) {
   // 로딩 표시 또는 이전 지도 화면이 사라지고 새 화면이 나타남. DB의 기록은 삭제하지 않음.
   app.replaceChildren(heading, layout);
   // 새 지도가 화면에 붙은 뒤 조준선을 만들고, 조준선을 지우는 함수를 boot()에 반환함.
-  return startCrosshair(canvas);
+  return startMapEffects();
 }
 
 // 준비 함수에 화면을 그릴 함수의 이름을 전달함. renderMap()으로 즉시 호출하지 않음.
