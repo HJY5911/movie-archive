@@ -33,12 +33,13 @@ function renderMovies(context) {
   input.id = 'movie-search';
   input.type = 'search';
   input.name = 'q';
+  input.className = 'form-control';
   input.value = query;
-  input.placeholder = '예: 달우1';
+  input.placeholder = '예: 시달소';
   input.setAttribute('aria-label', '영화 제목, 별칭, 배우 또는 감독');
   const submit = document.createElement('button');
   submit.type = 'submit';
-  submit.className = 'button';
+  submit.className = 'btn btn-primary';
   submit.textContent = '검색';
   form.appendChild(label);
   form.appendChild(input);

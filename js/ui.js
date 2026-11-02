@@ -40,23 +40,45 @@ export function movieCard(catalog, movie, { watched = false } = {}) {
     .map(row => catalog.lookup.genreById.get(row.genre_id).name);
 
   const card = document.createElement('article');
-  card.className = 'movie-card';
+  card.className = 'movie-card card';
+
+  const poster = document.createElement('img');
+  poster.className = 'movie-card-poster card-img-top';
+  poster.src = movie.poster_url || 'assets/posters/placeholder.jpg';
+  poster.alt = '';
+  poster.loading = 'lazy';
+  card.appendChild(poster);
+
+  const body = document.createElement('div');
+  body.className = 'card-body';
+  card.appendChild(body);
 
   const heading = document.createElement('h3');
+  heading.className = 'card-title';
   const link = document.createElement('a');
+  link.className = 'stretched-link';
   link.href = `movie.html?id=${encodeURIComponent(movie.movie_id)}`;
   link.textContent = movie.title;
   heading.appendChild(link);
-  card.appendChild(heading);
+  body.appendChild(heading);
 
   const details = document.createElement('p');
-  details.textContent = `개봉: ${movie.release_date ?? '미등록'} / 장르: ${genres.join(', ')} / 상영 시간: ${movie.runtime_min === null ? '미등록' : `${movie.runtime_min}분`}`;
-  card.appendChild(details);
+  details.className = 'movie-card-meta';
+  details.textContent = `${movie.release_date ? movie.release_date.slice(0, 4) : '개봉일 미등록'} · ${movie.runtime_min === null ? '상영 시간 미등록' : `${movie.runtime_min}분`}`;
+  body.appendChild(details);
+
+  if (genres.length > 0) {
+    const genreLine = document.createElement('p');
+    genreLine.className = 'movie-card-genres';
+    genreLine.textContent = genres.join(' · ');
+    body.appendChild(genreLine);
+  }
 
   if (watched) {
     const watchedNote = document.createElement('p');
+    watchedNote.className = 'movie-card-watched badge';
     watchedNote.textContent = '감상한 영화';
-    card.appendChild(watchedNote);
+    body.appendChild(watchedNote);
   }
   return card;
 }
@@ -68,15 +90,18 @@ const navigation = [
 ];
 
 function mountShell(page) {
-  const nav = el('nav', { ariaLabel: '주 메뉴' });
-  const list = el('ul');
+  const nav = el('nav', { className: 'navbar navbar-expand site-navbar', ariaLabel: '주 메뉴', dataset: { bsTheme: 'dark' } });
+  const shell = el('div', { className: 'container-xl' });
+  const brand = el('a', { className: 'navbar-brand', href: 'index.html' }, 'FILM', el('span', { className: 'navbar-brand-accent' }, 'LOG'));
+  const list = el('ul', { className: 'navbar-nav' });
   for (const [key, title] of navigation) {
     const active = key === page || page === 'movie' && key === 'movies';
-    const link = el('a', { href: `${key}.html` }, `${title}${active ? ' (현재)' : ''}`);
+    const link = el('a', { className: active ? 'nav-link active' : 'nav-link', href: `${key}.html` }, title, active ? el('span', { className: 'visually-hidden' }, ' (현재)') : null);
     if (active) link.setAttribute('aria-current', 'page');
-    list.append(el('li', {}, link));
+    list.append(el('li', { className: 'nav-item' }, link));
   }
-  nav.append(list);
+  shell.append(brand, list);
+  nav.append(shell);
   document.querySelector('#sidebar').replaceChildren(nav);
 
   const topbar = document.querySelector('#topbar');
@@ -127,7 +152,7 @@ export async function boot({ page, title, render }) {
       el('h1', {}, '페이지를 불러올 수 없습니다'),
       el('p', {}, error.message),
       el('p', { className: 'muted' }, '위 오류 내용을 확인한 뒤 다시 시도해 주세요.'),
-      el('button', { className: 'button', onclick: () => location.reload() }, '다시 시도')
+      el('button', { className: 'btn btn-link', onclick: () => location.reload() }, '다시 시도')
     ));
   }
 }

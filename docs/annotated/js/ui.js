@@ -4,7 +4,8 @@
  * 이 파일은 HTML 요소를 만들고 메뉴·메시지·초기 실행 흐름을 연결함.
  * 실제 색상, 글자 크기, 간격 등은 CSS에서 정함. className을 붙이는 것만으로
  * 색상이 생기지는 않음. 해당 클래스를 사용하는 CSS 규칙이 있어야 함.
- * 현재 버전에서는 디자인 합의 전에도 기능을 확인할 수 있도록 장식을 뺐음.
+ * navbar, nav-link, card, btn, badge, visually-hidden 같은 이름은 Bootstrap 5.3.3 클래스임.
+ * Bootstrap CSS는 common.css 맨 위에서 불러오며, Bootstrap JS는 쓰지 않음.
  *
  * 읽는 순서:
  * 1. el(): HTML 요소를 만드는 공통 도구
@@ -143,8 +144,16 @@ export function showMessage(text, type = 'success') {
  * movie: 표시할 영화 한 편의 객체임.
  * 세 번째 인수 { watched = false } = {}는 옵션 객체에서 watched를 꺼내는 구조 분해임.
  * 옵션 객체를 생략해도 {}, watched를 생략해도 false를 사용하므로 호출하기 편함.
- * 반환값: 영화 제목, 기본 정보, 상세 링크를 넣은 article 요소임.
- * 현재는 포스터와 색상 장식을 생성하지 않음. 상세 화면의 입력·저장은 pages/movie.js에서 처리함.
+ * 반환값: 포스터·제목·개봉 연도·상영 시간·장르를 담은 포스터 카드(article 요소)임.
+ * 만들어지는 구조:
+ *   article.movie-card.card
+ *     img.movie-card-poster (2:3 포스터)
+ *     div.card-body
+ *       h3.card-title > a.stretched-link (제목, 상세 페이지 링크)
+ *       p.movie-card-meta (예: 2019 · 132분)
+ *       p.movie-card-genres (예: 드라마 · 스릴러, 장르가 있을 때만)
+ *       p.movie-card-watched.badge ('감상한 영화', watched가 참일 때만)
+ * 상세 화면의 입력·저장은 pages/movie.js에서 처리함.
  * 아래에서는 el()에 요소를 중첩해 전달하는 대신 기본 DOM 명령을 한 단계씩 사용함.
  * 요소를 만들기 → 속성과 글자를 넣기 → 부모 요소에 붙이기 순서로 읽으면 됨.
  */
@@ -160,50 +169,71 @@ export function movieCard(catalog, movie, { watched = false } = {}) {
     .map(row => catalog.lookup.genreById.get(row.genre_id).name);
 
   // document.createElement(태그 이름)는 브라우저의 기본 기능으로 새 HTML 요소를 만듦.
-  // article은 영화 한 편의 제목과 정보를 묶는 바깥 요소임. 아직 실제 문서에는 붙지 않았음.
+  // article은 영화 한 편의 포스터와 정보를 묶는 바깥 요소임. 아직 실제 문서에는 붙지 않았음.
   const card = document.createElement('article');
-  // className은 HTML의 class 속성에 해당함. 기존 이름을 유지해 같은 CSS를 적용받게 함.
-  card.className = 'movie-card';
+  // movie-card는 이 프로젝트의 카드 모양, card는 Bootstrap 카드 클래스임.
+  // card는 position: relative를 가지므로 아래 stretched-link가 카드 전체로 넓어질 수 있음.
+  card.className = 'movie-card card';
+
+  // 포스터 이미지임. 제목이 바로 아래 글자로 나오므로 alt는 빈 문자열(장식 이미지)로 둠.
+  // 이렇게 하면 화면 읽기 프로그램이 제목을 두 번 읽지 않음.
+  const poster = document.createElement('img');
+  // card-img-top은 Bootstrap 카드 위쪽 이미지 클래스이며 너비를 카드에 맞춤.
+  poster.className = 'movie-card-poster card-img-top';
+  // poster_url이 null이나 빈 문자열이면 ||의 오른쪽인 기본 포스터 그림을 씀.
+  poster.src = movie.poster_url || 'assets/posters/placeholder.jpg';
+  poster.alt = '';
+  // lazy는 이미지가 화면 가까이 올 때 내려받게 하는 브라우저 기능임.
+  poster.loading = 'lazy';
+  card.appendChild(poster);
+
+  // card-body는 Bootstrap 카드의 글자 영역임. 제목과 정보 문단을 이 안에 넣음.
+  const body = document.createElement('div');
+  body.className = 'card-body';
+  card.appendChild(body);
 
   // h3는 영화 제목을 담을 소제목, a는 제목을 클릭하면 상세 화면으로 이동하게 할 링크임.
-  // heading은 글자가 아니라 HTMLHeadingElement 객체이며, 그 안에 다음 줄의 링크를 넣을 예정임.
   const heading = document.createElement('h3');
-  // link는 아직 주소와 제목이 없는 HTMLAnchorElement 객체임. 바로 아래 href/textContent에서 값을 채움.
+  heading.className = 'card-title';
   const link = document.createElement('a');
+  // stretched-link는 Bootstrap 클래스임. 링크의 누르는 영역을 카드 전체로 넓혀
+  // 포스터를 눌러도 상세 페이지로 이동함. 실제 링크 요소는 제목 하나뿐임.
+  link.className = 'stretched-link';
   // href는 이동할 주소임. ?id=...는 이동할 페이지에 전달하는 검색 매개변수임.
   // encodeURIComponent는 ID의 특수문자가 URL 구조로 잘못 해석되지 않도록 인코딩함.
-  // 이 링크는 상세 페이지 주소를 만드는 것이며, 상세 기능 자체를 구현하는 코드는 아님.
   link.href = `movie.html?id=${encodeURIComponent(movie.movie_id)}`;
   // textContent는 제목을 일반 글자로 넣음. 제목에 '<b>'가 있어도 HTML 태그로 해석하지 않음.
   link.textContent = movie.title;
-  // 부모.appendChild(자식)는 자식 노드 한 개를 부모의 맨 뒤에 붙임.
-  // 먼저 h3 안에 a를 넣고, 그 h3를 article 안에 넣음.
-  // 결과는 <article class="movie-card"><h3><a ...>제목</a></h3></article> 구조임.
-  // 이 줄의 부모는 heading(h3), 자식은 link(a)임. 영화 제목을 누를 수 있는 소제목으로 묶음.
+  // 먼저 h3 안에 a를 넣고, 그 h3를 card-body 안에 넣음.
   heading.appendChild(link);
-  // 이 줄의 부모는 card(article), 자식은 링크가 들어 있는 heading(h3)임. 링크만 따로 두지 않음.
-  card.appendChild(heading);
+  body.appendChild(heading);
 
-  // 개봉 날짜·장르·상영 시간은 한 문단(p)에 넣음. const 변수에 요소를 보관해 순서대로 설정함.
+  // 개봉 연도와 상영 시간을 ' · '로 이은 한 줄임. 예: '2019 · 132분'
   const details = document.createElement('p');
-  // ??는 왼쪽 값이 null 또는 undefined일 때만 오른쪽 값을 사용함.
-  // join(', ')은 장르 배열을 쉼표와 공백으로 이어 붙임. 빈 배열이면 빈 문자열임.
-  // 상영 시간은 null일 때 '미등록', 숫자가 있으면 '120분'처럼 표시함.
-  // 백틱(`...`)은 템플릿 문자열이며 ${표현식} 자리에 계산 결과를 끼워 넣음.
+  details.className = 'movie-card-meta';
+  // 조건 ? 참일 때 값 : 거짓일 때 값 은 삼항 연산자임.
+  // release_date가 있으면 slice(0, 4)로 앞 네 글자(연도)만 꺼내고, 없으면 '개봉일 미등록'을 씀.
+  // 상영 시간은 null일 때 '상영 시간 미등록', 숫자가 있으면 '120분'처럼 표시함.
   // 바깥 템플릿 문자열 안의 ${...}에서 또 다른 템플릿 문자열을 사용할 수 있음.
-  details.textContent = `개봉: ${movie.release_date ?? '미등록'} / 장르: ${genres.join(', ')} / 상영 시간: ${movie.runtime_min === null ? '미등록' : `${movie.runtime_min}분`}`;
-  // 이미 제목이 들어 있는 card의 맨 뒤에 정보 문단을 붙임. 제목은 유지됨.
-  card.appendChild(details);
+  details.textContent = `${movie.release_date ? movie.release_date.slice(0, 4) : '개봉일 미등록'} · ${movie.runtime_min === null ? '상영 시간 미등록' : `${movie.runtime_min}분`}`;
+  body.appendChild(details);
 
-  // watched가 참일 때만 추가 안내 문단을 만듦. 거짓이면 이 세 줄은 실행하지 않음.
-  // 최근 감상 기록에서는 watched:true로 호출하고, 일반 영화 목록에서는 기본값 false를 사용함.
+  // 장르가 하나 이상일 때만 장르 줄을 만듦. join(' · ')은 배열 항목 사이에 ' · '를 넣어 이음.
+  if (genres.length > 0) {
+    const genreLine = document.createElement('p');
+    genreLine.className = 'movie-card-genres';
+    genreLine.textContent = genres.join(' · ');
+    body.appendChild(genreLine);
+  }
+
+  // watched가 참일 때만 '감상한 영화' 표시를 만듦. 최근 감상 기록과 검색 결과에서 씀.
   if (watched) {
-    // 영화 제목·기본 정보와 별도로 '감상한 영화' 문구를 담을 문단을 새로 만듦.
     const watchedNote = document.createElement('p');
-    // 새 문단 안에 실제로 보일 문자열을 넣음. watched 여부를 DB에 저장하는 코드는 아님.
+    // badge는 Bootstrap의 작은 표시 클래스임. CSS가 포스터 왼쪽 위에 주황 띠로 띄움.
+    watchedNote.className = 'movie-card-watched badge';
+    // 실제로 보일 문자열을 넣음. watched 여부를 DB에 저장하는 코드는 아님.
     watchedNote.textContent = '감상한 영화';
-    // 부모 card의 마지막 자식으로 붙여 제목과 기본 정보 다음에 감상 여부가 나오게 함.
-    card.appendChild(watchedNote);
+    body.appendChild(watchedNote);
   }
   // 완성한 요소를 호출한 곳에 반환함. 호출한 페이지가 이 요소를 본문에 붙여 실제로 보여줌.
   return card;
@@ -224,30 +254,41 @@ const navigation = [
  * page는 'index', 'calendar'처럼 현재 페이지를 구분하는 값임.
  * export가 없으므로 다른 모듈에서 직접 가져올 수 없고, 아래 boot()가 내부에서 호출함.
  * 반환값은 없으며 기존 문서 요소의 자식들을 변경하는 함수임.
+ * 메뉴는 Bootstrap navbar 구조로 만듦:
+ *   nav.navbar > div.container-xl > a.navbar-brand(로고) + ul.navbar-nav > li.nav-item > a.nav-link
  */
 function mountShell(page) {
   // ariaLabel은 이 내비게이션의 목적을 화면 읽기 프로그램에 알려주는 이름임.
-  const nav = el('nav', { ariaLabel: '주 메뉴' });
+  // navbar-expand는 화면 너비와 관계없이 메뉴를 가로로 펼치는 Bootstrap 클래스임.
+  // site-navbar는 이 프로젝트의 메뉴 막대 모양을 common.css에서 정할 때 쓰는 이름임.
+  // dataset: { bsTheme: 'dark' }는 data-bs-theme="dark" 속성이 되며,
+  // Bootstrap이 이 안쪽 요소들에 어두운 바탕용 글자색을 쓰게 함.
+  const nav = el('nav', { className: 'navbar navbar-expand site-navbar', ariaLabel: '주 메뉴', dataset: { bsTheme: 'dark' } });
+  // container-xl은 메뉴 내용을 본문과 같은 너비 안에 가두는 Bootstrap 클래스임.
+  const shell = el('div', { className: 'container-xl' });
+  // 왼쪽 로고 글자 링크임. FILMLOG는 가칭이며 누르면 메인 페이지로 이동함.
+  // 뒤쪽 LOG만 span으로 감싸 CSS가 주황색으로 칠함. 읽을 때는 'FILMLOG' 한 단어임.
+  const brand = el('a', { className: 'navbar-brand', href: 'index.html' }, 'FILM', el('span', { className: 'navbar-brand-accent' }, 'LOG'));
   // ul은 메뉴 항목(li)들을 담을 목록임. 아직 nav 안에 들어 있지는 않음.
-  const list = el('ul');
+  const list = el('ul', { className: 'navbar-nav' });
   // 배열 구조 분해로 현재 반복 항목의 파일 이름을 key, 메뉴 이름을 title로 받음.
   for (const [key, title] of navigation) {
     // &&가 ||보다 먼저 계산되므로 다음과 같은 뜻임.
     // (현재 메뉴 key와 page가 같음) 또는 (상세 페이지 movie이면서 영화 검색 메뉴임).
     // 상세 페이지에는 별도 메뉴가 없으므로 영화 검색 메뉴를 현재 위치로 표시함.
     const active = key === page || page === 'movie' && key === 'movies';
-    // active가 참이면 이름 뒤에 ' (현재)'를 붙이고, 거짓이면 빈 문자열을 붙임.
-    // 예: key='movies'이면 href='movies.html'임. title='영화 검색'은 링크에 보일 글자임.
-    // 상세 페이지를 보고 있을 때도 active가 참이 되어 '영화 검색 (현재)'라고 표시함.
-    const link = el('a', { href: `${key}.html` }, `${title}${active ? ' (현재)' : ''}`);
-    // 현재 위치임을 보조 기술에도 전달함. 화면에 보이는 '(현재)'와 역할이 다름.
+    // 현재 메뉴에는 Bootstrap의 active 클래스를 더 붙여 굵은 글자 + 주황 밑줄 막대로 보여줌.
+    // ' (현재)' 글자는 visually-hidden span에 넣음. 화면에는 보이지 않고 화면 읽기 프로그램만 읽음.
+    // 현재 메뉴가 아니면 세 번째 자식 자리에 null을 넘기며, el()은 null 자식을 건너뜀.
+    const link = el('a', { className: active ? 'nav-link active' : 'nav-link', href: `${key}.html` }, title, active ? el('span', { className: 'visually-hidden' }, ' (현재)') : null);
+    // 현재 위치임을 보조 기술에도 전달함.
     if (active) link.setAttribute('aria-current', 'page');
     // li 안에 링크를 넣고, 완성한 li를 부모 list(ul)에 추가함.
-    // 각 반복에서 새로운 li/a가 만들어지므로 메뉴 항목들이 차례로 쌓임.
-    list.append(el('li', {}, link));
+    list.append(el('li', { className: 'nav-item' }, link));
   }
-  // 부모 nav에 메뉴 목록 ul을 붙임. nav → ul → li → a 계층이 완성됨.
-  nav.append(list);
+  // 로고와 메뉴 목록을 안쪽 묶음에 넣고, 그 묶음을 nav에 넣음.
+  shell.append(brand, list);
+  nav.append(shell);
   // replaceChildren은 대상 요소 자체는 유지하고 기존 자식들을 전달한 새 자식들로 교체함.
   document.querySelector('#sidebar').replaceChildren(nav);
 
@@ -257,7 +298,7 @@ function mountShell(page) {
   // 부모 header 자체와 그 id는 유지됨. 다음 코드에서 알림 영역을 같은 header에 추가함.
   topbar.replaceChildren(el('p', {}, '저장 위치: 현재 브라우저'));
   // 감상 기록은 서버에 올리는 것이 아니라 이 사이트를 연 브라우저의 IndexedDB에 저장함.
-  // 안내를 본문 위에서 볼 수 있게, HTML에 있던 메시지 요소를 topbar 쪽으로 이동함.
+  // HTML에 있던 메시지 요소를 topbar 쪽으로 이동함. 화면에서는 common.css가 오른쪽 아래에 띄워 보여줌.
   const messages = document.querySelector('#messages');
   // querySelector는 요소가 없으면 null을 반환하므로, 존재할 때만 append함.
   // 이미 문서 안에 있는 요소를 append하면 복제하지 않고 원래 자리에서 새 자리로 옮김.
@@ -377,7 +418,8 @@ export async function boot({ page, title, render }) {
       el('p', { className: 'muted' }, '위 오류 내용을 확인한 뒤 다시 시도해 주세요.'),
       // onclick에는 함수를 넘김. () => 없이 location.reload()를 쓰면 생성 즉시 실행됨.
       // location.reload()는 refresh()와 달리 브라우저의 현재 문서를 실제로 다시 불러옴.
-      el('button', { className: 'button', onclick: () => location.reload() }, '다시 시도')
+      // btn btn-link는 Bootstrap의 글자 버튼 모양임.
+      el('button', { className: 'btn btn-link', onclick: () => location.reload() }, '다시 시도')
     ));
   }
 }

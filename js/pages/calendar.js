@@ -58,13 +58,13 @@ function renderCalendar(context) {
   const previous = el('button', {
     id: 'calendar-previous',
     type: 'button',
-    className: 'button secondary',
+    className: 'btn btn-link',
     ariaLabel: '이전 달'
   }, '이전 달');
   const next = el('button', {
     id: 'calendar-next',
     type: 'button',
-    className: 'button secondary',
+    className: 'btn btn-link',
     ariaLabel: '다음 달'
   }, '다음 달');
   previous.addEventListener('click', showPreviousMonth);

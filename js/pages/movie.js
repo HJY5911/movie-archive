@@ -89,7 +89,7 @@ async function renderMovie(context) {
     const empty = el('section', { className: 'empty-state' });
     const title = el('h1', {}, '영화를 찾을 수 없습니다');
     const help = el('p', {}, '주소의 영화 ID를 확인하거나 영화 목록에서 다시 선택해 주세요.');
-    const back = el('a', { href: 'movies.html', className: 'button' }, '영화 목록으로');
+    const back = el('a', { href: 'movies.html', className: 'btn btn-link' }, '영화 목록으로');
     empty.append(title, help, back);
     app.replaceChildren(empty);
     return;
@@ -125,13 +125,36 @@ async function renderMovie(context) {
   if (movie.runtime_min !== null) runtimeText = movie.runtime_min + '분';
   let countryText = '제작 국가 정보 없음';
   if (countryNames.length > 0) countryText = countryNames.join(', ');
-  const metadata = el('p', {}, `${releaseText} · ${runtimeText} · ${countryText}`);
+  const metadata = el('p', { className: 'detail-meta' }, `${releaseText} · ${runtimeText} · ${countryText}`);
+  let watchCount = 0;
+  let ratedCount = 0;
+  let ratingSum = 0;
+  for (const row of snapshot.logs) {
+    if (row.movie_id !== movieId) continue;
+    watchCount += 1;
+    if (row.rating !== null) {
+      ratedCount += 1;
+      ratingSum += row.rating;
+    }
+  }
+  const ratingLine = el('p', { className: 'detail-rating' });
+  if (ratedCount > 0) {
+    const star = el('span', { className: 'detail-rating-star', ariaHidden: 'true' }, '★');
+    const average = el('strong', {}, (ratingSum / ratedCount).toFixed(1));
+    const ratingNote = el('span', { className: 'muted' }, `/ 5 · 나의 평균 별점 · 감상 ${watchCount}회`);
+    ratingLine.append(star, average, ratingNote);
+  } else {
+    const ratingNote = el('span', { className: 'muted' }, `별점 미입력 · 감상 ${watchCount}회`);
+    ratingLine.append(ratingNote);
+  }
   let overviewText = '줄거리 정보가 없습니다.';
   if (movie.overview) overviewText = movie.overview;
   const overview = el('p', { className: 'overview' }, overviewText);
-  const directors = el('p', {}, '감독: ' + creditNames(catalog, 'director'));
-  const actors = el('p', {}, '출연: ' + creditNames(catalog, 'actor'));
-  info.append(title, tags, metadata, overview, directors, actors);
+  const directors = el('p', { className: 'detail-credit' }, el('strong', {}, '감독:'), ' ', el('span', {}, creditNames(catalog, 'director')));
+  const actors = el('p', { className: 'detail-credit' }, el('strong', {}, '출연:'), ' ', el('span', {}, creditNames(catalog, 'actor')));
+  info.append(title, metadata, tags);
+  if (watchCount > 0) info.append(ratingLine);
+  info.append(overview, directors, actors);
   details.append(info);
 
   let formTitleText = '감상 기록 추가';
@@ -147,6 +170,7 @@ async function renderMovie(context) {
     id: 'watched-on',
     name: 'watched_on',
     type: 'date',
+    className: 'form-control',
     required: true,
     value: draft.watched_on,
     disabled: busy
@@ -154,6 +178,7 @@ async function renderMovie(context) {
   const rating = el('select', {
     id: 'rating',
     name: 'rating',
+    className: 'form-select',
     disabled: busy
   });
   const noRating = el('option', { value: '' }, '별점 남기지 않음');
@@ -167,6 +192,7 @@ async function renderMovie(context) {
     id: 'review-text',
     name: 'review_text',
     rows: 5,
+    className: 'form-control',
     placeholder: '감상평을 입력하세요.',
     value: draft.review_text,
     disabled: busy
@@ -185,19 +211,19 @@ async function renderMovie(context) {
   review.addEventListener('input', rememberReview);
   const fields = el('div', { className: 'form-grid' });
   const dateField = el('div', { className: 'field' });
-  const dateLabel = el('label', { htmlFor: 'watched-on' }, '감상 날짜 · 필수');
+  const dateLabel = el('label', { htmlFor: 'watched-on', className: 'form-label' }, '감상 날짜 · 필수');
   dateField.append(dateLabel, date);
   const ratingField = el('div', { className: 'field' });
-  const ratingLabelElement = el('label', { htmlFor: 'rating' }, '별점 · 선택');
+  const ratingLabelElement = el('label', { htmlFor: 'rating', className: 'form-label' }, '별점 · 선택');
   ratingField.append(ratingLabelElement, rating);
   fields.append(dateField, ratingField);
   const reviewField = el('div', { className: 'field' });
-  const reviewLabel = el('label', { htmlFor: 'review-text' }, '감상평 · 선택');
+  const reviewLabel = el('label', { htmlFor: 'review-text', className: 'form-label' }, '감상평 · 선택');
   reviewField.append(reviewLabel, review);
   const formHelp = el('p', {}, '같은 영화를 같은 날 여러 번 감상한 기록도 각각 저장할 수 있습니다.');
   const status = el('p', { id: 'watch-status', className: 'status', ariaLive: 'polite' }, statusText);
   if (statusIsError) status.classList.add('error');
-  const submit = el('button', { id: 'watch-submit', type: 'submit', className: 'button', disabled: busy }, submitText);
+  const submit = el('button', { id: 'watch-submit', type: 'submit', className: 'btn btn-primary', disabled: busy }, submitText);
   const buttons = el('div', { className: 'toolbar' });
   buttons.append(submit);
 
@@ -236,7 +262,7 @@ async function renderMovie(context) {
   }
 
   if (editingId !== null) {
-    const cancel = el('button', { id: 'watch-cancel', type: 'button', className: 'button secondary', disabled: busy }, '수정 취소');
+    const cancel = el('button', { id: 'watch-cancel', type: 'button', className: 'btn btn-link', disabled: busy }, '수정 취소');
     cancel.addEventListener('click', cancelEditing);
     buttons.append(cancel);
   }
@@ -296,7 +322,9 @@ async function renderMovie(context) {
     recordPanel.append(empty);
   }
   for (const row of logs) {
-    const card = el('article', { className: 'log-card' });
+    let cardClass = 'log-card';
+    if (editingId === row.log_id) cardClass = 'log-card is-editing';
+    const card = el('article', { className: cardClass });
     const recordHeading = el('div', { className: 'record-heading' });
     const watchedOn = el('strong', {}, row.watched_on);
     const savedRating = el('span', { className: 'rating' }, ratingLabel(row.rating));
@@ -306,8 +334,8 @@ async function renderMovie(context) {
     const savedReview = el('p', { className: 'review-text' }, reviewText);
     const updated = el('p', {}, '최근 저장: ' + new Date(row.updated_at).toLocaleString('ko-KR'));
     const actions = el('div', { className: 'toolbar' });
-    const edit = el('button', { type: 'button', className: 'button secondary', disabled: busy }, '수정');
-    const remove = el('button', { type: 'button', className: 'button danger', disabled: busy }, '삭제');
+    const edit = el('button', { type: 'button', className: 'btn btn-link', disabled: busy }, '수정');
+    const remove = el('button', { type: 'button', className: 'btn btn-link text-danger', disabled: busy }, '삭제');
 
     async function editRecord() {
       if (busy) return;

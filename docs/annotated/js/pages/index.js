@@ -99,6 +99,8 @@ boot({
     type: 'search',
     // name은 폼 데이터의 항목 이름임. 검색 페이지에 q라는 이름으로 검색어를 전달함.
     name: 'q',
+    // form-control은 Bootstrap의 입력칸 모양 클래스임. 테두리·여백·초점 표시를 정함.
+    className: 'form-control',
     // placeholder는 아무것도 입력하지 않았을 때 보이는 안내임. 실제 입력값은 아님.
     placeholder: '영화 제목, 배우 또는 감독을 검색하세요',
     // ariaLabel은 화면 읽기 프로그램 등이 이 입력칸의 목적을 알 수 있도록 붙이는 이름임.
@@ -114,8 +116,9 @@ boot({
     el('label', { htmlFor: 'movie-search' }, '영화 검색'),
     // 둘째 자식: 위에서 만들어 둔 input DOM 객체를 그대로 붙임. 복사하거나 새로 만들지 않음.
     input,
-    // 셋째 자식: button 클래스를 가진 제출 버튼을 만들어 붙임. '검색'은 버튼 안의 글자임.
-    el('button', { className: 'button', type: 'submit' }, '검색')
+    // 셋째 자식: 제출 버튼을 만들어 붙임. '검색'은 버튼 안의 글자임.
+    // btn btn-primary는 Bootstrap의 채워진 주요 버튼 모양임. 이 사이트에서는 주황 바탕임.
+    el('button', { className: 'btn btn-primary', type: 'submit' }, '검색')
   );
 
   // addEventListener(이벤트 이름, 처리 함수)는 나중에 발생할 이벤트의 처리 방법을 등록함.
@@ -182,7 +185,8 @@ boot({
 
   // 최근 기록 영역에는 제목과 캘린더 링크를 먼저 넣음.
   // a 태그의 href는 클릭 후 이동할 주소이며, 이 코드가 캘린더 내용을 만드는 것은 아님.
-  const recent = el('section', { className: 'page-section' },
+  // index-shelf는 넓은 화면에서 카드 줄과 구역 제목의 너비를 함께 맞추는 메인 전용 클래스임.
+  const recent = el('section', { className: 'page-section index-shelf' },
     // section의 첫 자식으로 구역 제목과 이동 링크를 함께 감싸는 div를 만듦.
     el('div', { className: 'section-heading' },
       // div 안의 첫 자식은 최근 기록 구역의 소제목 h2임.
@@ -201,15 +205,15 @@ boot({
       el('h3', {}, '감상 기록이 없습니다'),
       // 둘째 자식: 아래 예시 버튼으로 무엇을 확인할 수 있는지 설명하는 p임.
       el('p', {}, '예시 기록 버튼으로 저장과 감상 요약을 확인할 수 있습니다.'),
-      // 모양에 'button' 클래스가 있어도 실제 태그가 a이므로 동작은 페이지 이동 링크임.
-      el('a', { href: 'movies.html', className: 'button' }, '영화 검색 페이지로 이동')
+      // btn btn-link는 Bootstrap의 글자 버튼 모양임. 실제 태그가 a이므로 동작은 페이지 이동 링크임.
+      el('a', { href: 'movies.html', className: 'btn btn-link' }, '영화 검색 페이지로 이동')
     );
     // type='button'은 폼 제출용이 아닌 일반 버튼임. 동작은 아래 click 이벤트가 정함.
     const sampleButton = el('button', {
       // 이 버튼은 form 제출 대신 아래의 click 함수에서 예시 기록을 저장함.
       type: 'button',
-      // 공통 버튼과 보조 버튼을 구분하는 클래스 두 개를 붙임.
-      className: 'button secondary'
+      // 채워진 사각형이 아닌 글자 버튼(btn btn-link) 모양을 씀.
+      className: 'btn btn-link'
     }, '예시 감상 기록 6개 넣어보기');
 
     // disabled=true이면 버튼을 누를 수 없음. 기본 영화 목록이 비어 있으면 비활성화함.
@@ -302,7 +306,8 @@ boot({
   } else {
     // 감상 기록이 이미 있는 경우 최대 4건의 최근 기록을 표시함.
     // cards는 개별 영화 카드 article들을 담는 div이며 card-grid CSS가 열 배치를 정함.
-    const cards = el('div', { className: 'card-grid' });
+    // index-recent-grid는 모든 카드가 감상한 영화인 이 목록에서 '감상한 영화' 표시를 숨기는 데 쓰는 클래스임.
+    const cards = el('div', { className: 'card-grid index-recent-grid' });
 
     // snapshot.logs는 repository.js의 readSnapshot()에서 이미 최신 기록부터 정렬해서 전달함.
     // 정렬 기준은 최신 감상 날짜 → 최신 등록 시각 → 두 값이 같으면 기록 ID 순임.
@@ -333,7 +338,7 @@ boot({
   }
 
   // 감상 여부와 관계없이 기본 영화 목록 일부를 보여주는 영역임.
-  const explore = el('section', { className: 'page-section' },
+  const explore = el('section', { className: 'page-section index-shelf' },
     // section 안에 제목과 전체 보기 링크를 함께 담는 div를 만듦.
     el('div', { className: 'section-heading' },
       // 이 구역이 영화 목록임을 나타내는 소제목 h2임.

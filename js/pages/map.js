@@ -93,7 +93,7 @@ function renderMap(context) {
 
   const heading = el('div', { className: 'page-heading' });
   const pageTitle = el('h1', {}, '영화 지도');
-  const description = el('p', { className: 'muted' }, '영화의 제작 국가를 지도 위의 핀으로 보여줍니다. 핀이 클수록 해당 국가의 영화가 많습니다.');
+  const description = el('p', { className: 'muted' }, '영화의 제작 국가를 지도 위의 핀으로 보여줍니다. 핀을 누르면 그 국가의 영화 목록을 볼 수 있습니다.');
   heading.append(pageTitle, description);
 
   async function refreshMap(focusId) {
@@ -131,12 +131,12 @@ function renderMap(context) {
   const watchedButton = el('button', {
     id: 'map-mode-watched',
     type: 'button',
-    className: 'button secondary'
+    className: 'btn btn-link'
   }, '감상한 영화');
   const allButton = el('button', {
     id: 'map-mode-all',
     type: 'button',
-    className: 'button secondary'
+    className: 'btn btn-link'
   }, '등록된 전체 영화');
   watchedButton.setAttribute('aria-pressed', String(mode === 'watched'));
   allButton.setAttribute('aria-pressed', String(mode === 'all'));
@@ -155,11 +155,23 @@ function renderMap(context) {
   const mapImage = el('img', { src: 'assets/world-map.jpg', alt: '제작 국가 핀을 표시하는 세계 지도' });
   canvas.append(mapImage);
 
+  const leanWest = new Set();
+  const leanEast = new Set();
+  for (const west of ranking) {
+    for (const east of ranking) {
+      const lngGap = east.country.pin_lng - west.country.pin_lng;
+      const latGap = Math.abs(east.country.pin_lat - west.country.pin_lat);
+      if (lngGap > 0 && lngGap < 20 && latGap < 15) {
+        leanWest.add(west.country.country_code);
+        leanEast.add(east.country.country_code);
+      }
+    }
+  }
+
   for (const entry of ranking) {
     const country = entry.country;
     const count = entry.movie_ids.length;
     const position = toMapPosition(country.pin_lat, country.pin_lng);
-    const size = 26 + Math.round(18 * count / maxCount);
     const pinId = 'map-pin-' + country.country_code;
 
     const pin = el('button', {
@@ -170,11 +182,14 @@ function renderMap(context) {
     });
     pin.style.left = position.left + '%';
     pin.style.top = position.top + '%';
-    pin.style.setProperty('--size', size + 'px');
+    if (leanWest.has(country.country_code) && !leanEast.has(country.country_code)) {
+      pin.classList.add('map-pin-west');
+    }
+    if (leanEast.has(country.country_code) && !leanWest.has(country.country_code)) {
+      pin.classList.add('map-pin-east');
+    }
 
     const pinHead = el('span', { className: 'map-pin-head' });
-    const pinCount = el('span', { className: 'map-pin-count' }, String(count));
-    pinHead.append(pinCount);
     const pinLabel = el('span', { className: 'map-pin-label' }, `${country.name} · ${count}편`);
     pin.append(pinHead, pinLabel);
 
@@ -199,8 +214,8 @@ function renderMap(context) {
   if (ranking.length === 0 && mode === 'watched') {
     const empty = el('div', { className: 'empty-state' });
     const emptyMessage = el('p', {}, '아직 감상 기록이 없어 지도에 표시할 핀이 없습니다.');
-    const homeLink = el('a', { href: 'index.html', className: 'button' }, '메인 페이지로 이동');
-    const allMoviesButton = el('button', { type: 'button', className: 'button secondary' }, '등록된 전체 영화로 보기');
+    const homeLink = el('a', { href: 'index.html', className: 'btn btn-link' }, '메인 페이지로 이동');
+    const allMoviesButton = el('button', { type: 'button', className: 'btn btn-link' }, '등록된 전체 영화로 보기');
     allMoviesButton.addEventListener('click', showAll);
     empty.append(emptyMessage, homeLink, allMoviesButton);
     mapPanel.append(empty);

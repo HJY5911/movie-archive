@@ -164,8 +164,8 @@ async function renderMovie(context) {
     const title = el('h1', {}, '영화를 찾을 수 없습니다');
     // 다음에 무엇을 해야 하는지 안내함.
     const help = el('p', {}, '주소의 영화 ID를 확인하거나 영화 목록에서 다시 선택해 주세요.');
-    // a 태그는 이동 링크임. button 클래스는 버튼 같은 모양만 지정함.
-    const back = el('a', { href: 'movies.html', className: 'button' }, '영화 목록으로');
+    // a 태그는 이동 링크임. btn btn-link는 Bootstrap의 글자 버튼 모양만 지정함.
+    const back = el('a', { href: 'movies.html', className: 'btn btn-link' }, '영화 목록으로');
     // 제목·안내·링크를 부모 요소 뒤에 순서대로 붙임.
     empty.append(title, help, back);
     // 로딩 표시를 안내 화면으로 교체하며 main 자체는 유지함.
@@ -230,7 +230,36 @@ async function renderMovie(context) {
   // 국가가 하나 이상이면 모든 이름을 쉼표로 연결함.
   if (countryNames.length > 0) countryText = countryNames.join(', ');
   // 템플릿 문자열로 날짜·시간·국가를 한 문단에 표시함.
-  const metadata = el('p', {}, `${releaseText} · ${runtimeText} · ${countryText}`);
+  // detail-meta 클래스는 제목 바로 아래의 회색 정보 줄 모양을 정할 이름임.
+  const metadata = el('p', { className: 'detail-meta' }, `${releaseText} · ${runtimeText} · ${countryText}`);
+  // 제목 영역에 보여줄 '나의 별점' 요약을 계산함. 감상 횟수, 별점을 남긴 횟수, 별점 합계임.
+  let watchCount = 0;
+  let ratedCount = 0;
+  let ratingSum = 0;
+  // 전체 감상 기록 중 이 영화의 기록만 셈. continue는 이번 반복을 건너뛰고 다음 기록으로 감.
+  for (const row of snapshot.logs) {
+    if (row.movie_id !== movieId) continue;
+    watchCount += 1;
+    // 별점을 남기지 않은 기록(null)은 평균 계산에서 뺌.
+    if (row.rating !== null) {
+      ratedCount += 1;
+      ratingSum += row.rating;
+    }
+  }
+  // 별점 요약 줄임. 감상 기록이 하나도 없으면 아래에서 화면에 붙이지 않음.
+  const ratingLine = el('p', { className: 'detail-rating' });
+  if (ratedCount > 0) {
+    // 별 기호는 장식이므로 ariaHidden으로 화면 읽기 프로그램에서 제외함.
+    const star = el('span', { className: 'detail-rating-star', ariaHidden: 'true' }, '★');
+    // 평균 별점을 소수점 한 자리 문자열로 만듦. 예: 4.25 → '4.3'
+    const average = el('strong', {}, (ratingSum / ratedCount).toFixed(1));
+    const ratingNote = el('span', { className: 'muted' }, `/ 5 · 나의 평균 별점 · 감상 ${watchCount}회`);
+    ratingLine.append(star, average, ratingNote);
+  } else {
+    // 감상 기록은 있지만 모두 별점을 남기지 않은 경우임.
+    const ratingNote = el('span', { className: 'muted' }, `별점 미입력 · 감상 ${watchCount}회`);
+    ratingLine.append(ratingNote);
+  }
   // 빈 줄거리에는 안내 문장을 사용함.
   let overviewText = '줄거리 정보가 없습니다.';
   // 글자가 있는 경우 실제 소개로 바꿈.
@@ -238,11 +267,17 @@ async function renderMovie(context) {
   // overview 클래스는 문단 간격과 줄바꿈을 지정할 대상임.
   const overview = el('p', { className: 'overview' }, overviewText);
   // 감독 역할로 연결된 인물을 찾아 표시함.
-  const directors = el('p', {}, '감독: ' + creditNames(catalog, 'director'));
+  // detail-credit 줄은 왼쪽 굵은 항목 이름(strong)과 오른쪽 이름 목록(span)으로 나눔.
+  // 사이의 ' '는 글자로 읽을 때 '감독: 봉준호'처럼 띄어 읽히게 하는 공백임.
+  const directors = el('p', { className: 'detail-credit' }, el('strong', {}, '감독:'), ' ', el('span', {}, creditNames(catalog, 'director')));
   // 배우 역할로 연결된 인물을 찾아 표시함. 감독과 같은 인물일 수도 있음.
-  const actors = el('p', {}, '출연: ' + creditNames(catalog, 'actor'));
+  const actors = el('p', { className: 'detail-credit' }, el('strong', {}, '출연:'), ' ', el('span', {}, creditNames(catalog, 'actor')));
   // 만들어진 자식들을 표시할 순서대로 한 부모 안에 넣음.
-  info.append(title, tags, metadata, overview, directors, actors);
+  // 제목 → 개봉·상영 시간·국가 → 장르 → 나의 별점 → 줄거리 → 감독·출연 순서임.
+  info.append(title, metadata, tags);
+  // 이 영화의 감상 기록이 있을 때만 별점 요약 줄을 넣음.
+  if (watchCount > 0) info.append(ratingLine);
+  info.append(overview, directors, actors);
   // 포스터 다음에 설명을 붙여 영화 정보 영역을 완성함.
   details.append(info);
 
@@ -271,6 +306,8 @@ async function renderMovie(context) {
     name: 'watched_on',
     // 브라우저 기본 날짜 입력을 사용함.
     type: 'date',
+    // form-control은 Bootstrap의 입력칸 모양 클래스임.
+    className: 'form-control',
     // 날짜는 필수이며 저장소에서도 유효한 실제 날짜인지 다시 검사함.
     required: true,
     // 재그리기 때 작성 중인 초안의 날짜를 되살림.
@@ -284,6 +321,8 @@ async function renderMovie(context) {
     id: 'rating',
     // 저장소가 받는 별점 항목 이름임.
     name: 'rating',
+    // form-select는 Bootstrap의 선택 상자 모양 클래스임.
+    className: 'form-select',
     // 작업 중에는 선택을 바꿀 수 없음.
     disabled: busy
   });
@@ -308,6 +347,8 @@ async function renderMovie(context) {
     name: 'review_text',
     // 보이는 초기 높이를 약 다섯 줄로 정함. 입력 글자 수 제한은 아님.
     rows: 5,
+    // 여러 줄 입력칸도 form-control 모양을 씀.
+    className: 'form-control',
     // 비었을 때 보이는 안내이며 실제 입력값에 포함되지 않음.
     placeholder: '감상평을 입력하세요.',
     // 화면이 갱신되어도 작성 중인 글을 유지함.
@@ -340,14 +381,14 @@ async function renderMovie(context) {
   const fields = el('div', { className: 'form-grid' });
   // 날짜 설명과 입력을 한 영역에 넣음.
   const dateField = el('div', { className: 'field' });
-  // htmlFor는 HTML의 for 속성임. 연결된 input의 id를 지정함.
-  const dateLabel = el('label', { htmlFor: 'watched-on' }, '감상 날짜 · 필수');
+  // htmlFor는 HTML의 for 속성임. 연결된 input의 id를 지정함. form-label은 Bootstrap의 입력 설명 모양임.
+  const dateLabel = el('label', { htmlFor: 'watched-on', className: 'form-label' }, '감상 날짜 · 필수');
   // label 다음에 실제 입력칸을 붙임.
   dateField.append(dateLabel, date);
   // 별점의 label과 select도 같은 영역에 묶음.
   const ratingField = el('div', { className: 'field' });
   // 별점은 선택 입력이라는 안내이며 해당 select와 연결됨.
-  const ratingLabelElement = el('label', { htmlFor: 'rating' }, '별점 · 선택');
+  const ratingLabelElement = el('label', { htmlFor: 'rating', className: 'form-label' }, '별점 · 선택');
   // 설명과 입력의 순서를 정함.
   ratingField.append(ratingLabelElement, rating);
   // 날짜 영역 다음에 별점 영역을 배치함.
@@ -355,7 +396,7 @@ async function renderMovie(context) {
   // 감상평은 별도의 여러 줄 입력 영역으로 만듦.
   const reviewField = el('div', { className: 'field' });
   // id가 review-text인 textarea와 연결한 설명임.
-  const reviewLabel = el('label', { htmlFor: 'review-text' }, '감상평 · 선택');
+  const reviewLabel = el('label', { htmlFor: 'review-text', className: 'form-label' }, '감상평 · 선택');
   // label 다음에 textarea를 붙임.
   reviewField.append(reviewLabel, review);
   // 같은 영화를 같은 날 다시 저장해도 별도 기록으로 남는 현재 규칙을 설명함.
@@ -366,7 +407,8 @@ async function renderMovie(context) {
   if (statusIsError) status.classList.add('error');
   // submit 버튼을 클릭하면 아래 submit 이벤트가 발생함. 브라우저가 입력칸의 Enter를 폼 제출로 처리할 때도 같음.
   // 여러 줄 입력인 textarea에서 Enter를 누르는 것은 일반적으로 감상평의 줄바꿈임.
-  const submit = el('button', { id: 'watch-submit', type: 'submit', className: 'button', disabled: busy }, submitText);
+  // btn btn-primary는 채워진 주요 버튼 모양임. 감상 기록 저장은 이 페이지의 핵심 동작이므로 이 모양을 씀.
+  const submit = el('button', { id: 'watch-submit', type: 'submit', className: 'btn btn-primary', disabled: busy }, submitText);
   // 저장/취소 버튼을 나란히 놓을 컨테이너임.
   const buttons = el('div', { className: 'toolbar' });
   // 항상 존재하는 저장 버튼부터 붙임.
@@ -435,7 +477,8 @@ async function renderMovie(context) {
   // 기존 기록을 수정할 때만 취소 버튼이 필요함.
   if (editingId !== null) {
     // 일반 button이므로 폼을 제출하지 않음. id는 초기화 때 제거할 대상을 찾는 데 씀.
-    const cancel = el('button', { id: 'watch-cancel', type: 'button', className: 'button secondary', disabled: busy }, '수정 취소');
+    // btn btn-link는 Bootstrap의 글자 버튼 모양임.
+    const cancel = el('button', { id: 'watch-cancel', type: 'button', className: 'btn btn-link', disabled: busy }, '수정 취소');
     // 함수 자체를 등록하므로 지금 즉시 취소가 실행되는 것은 아님.
     cancel.addEventListener('click', cancelEditing);
     // 저장 버튼 다음에 취소 버튼을 넣음.
@@ -544,7 +587,10 @@ async function renderMovie(context) {
   // 각 기록마다 독립된 표시 카드와 수정·삭제 버튼을 만듦.
   for (const row of logs) {
     // article은 감상 기록 한 건을 묶는 의미상의 영역임.
-    const card = el('article', { className: 'log-card' });
+    // 지금 수정 중인 기록이면 is-editing 클래스를 더해 목록에서 어느 기록인지 표시함.
+    let cardClass = 'log-card';
+    if (editingId === row.log_id) cardClass = 'log-card is-editing';
+    const card = el('article', { className: cardClass });
     // 날짜와 별점을 같은 줄에 배치할 묶음임.
     const recordHeading = el('div', { className: 'record-heading' });
     // 실제 영화를 본 날짜를 강조함.
@@ -563,10 +609,11 @@ async function renderMovie(context) {
     const updated = el('p', {}, '최근 저장: ' + new Date(row.updated_at).toLocaleString('ko-KR'));
     // 기록 작업용 버튼들을 묶음.
     const actions = el('div', { className: 'toolbar' });
-    // 수정 버튼은 폼을 제출하지 않는 일반 버튼임.
-    const edit = el('button', { type: 'button', className: 'button secondary', disabled: busy }, '수정');
+    // 수정 버튼은 폼을 제출하지 않는 일반 버튼이며 글자 버튼 모양임.
+    const edit = el('button', { type: 'button', className: 'btn btn-link', disabled: busy }, '수정');
     // 삭제 버튼도 일반 버튼이며 실제 삭제 여부는 확인창 이후 결정함.
-    const remove = el('button', { type: 'button', className: 'button danger', disabled: busy }, '삭제');
+    // text-danger는 Bootstrap의 빨간 글자 클래스임. 삭제 동작임을 글자색으로도 알려줌.
+    const remove = el('button', { type: 'button', className: 'btn btn-link text-danger', disabled: busy }, '삭제');
 
     // 이 반복의 row를 기억하는 함수임. 각 버튼은 자기 기록을 편집함(클로저).
     async function editRecord() {

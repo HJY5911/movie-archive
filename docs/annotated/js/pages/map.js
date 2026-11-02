@@ -57,7 +57,7 @@ function toMapPosition(lat, lng) {
  * moviesByCountry(catalog, logs): 현재 mode에 맞는 국가 코드별 영화 ID 목록을 만듦.
  * catalog: 영화 기본 자료, logs: 현재 프로필의 감상 기록 배열임.
  * 반환값: { 국가 코드: [영화 ID, ...] } 형태의 객체임. 영화가 없는 국가는 항목 자체가 없음.
- * 예: { KR: ['m001', 'm004'], US: ['m001'] }
+ * 예: { KR: ['m001'], GB: ['m003', 'm006'], US: ['m002', 'm006'] }
  * 한 영화가 여러 나라의 공동 제작이면 각 나라의 목록에 모두 들어감.
  * 반환된 배열은 이 파일에서 읽기만 하며 push·sort 등으로 수정하지 않음.
  */
@@ -173,13 +173,13 @@ function renderMap(context) {
   // compareRanking 뒤에 ()를 붙이지 않고 함수 자체를 넘기면 sort가 두 항목씩 넣어 호출함.
   ranking.sort(compareRanking);
 
-  // 핀 크기와 순위 막대 길이의 기준이 될 가장 큰 영화 수임.
-  // 국가가 없으면 핀 크기·순위 막대를 계산하는 아래 반복문이 실행되지 않아 이 값은 나눗셈에 쓰이지 않음.
+  // 국가 순위 막대 길이의 기준이 될 가장 큰 영화 수임. 지도 핀은 영화 수와 상관없이 모두 같은 크기라 이 값을 쓰지 않음.
+  // 국가가 없으면 순위 막대를 계산하는 아래 반복문이 실행되지 않아 이 값은 나눗셈에 쓰이지 않음.
   // 그래도 0으로 나누는 계산이 생기지 않도록 안전한 기본값 1로 시작함.
   let maxCount = 1;
   // 정렬 후 첫 번째 항목이 영화 수가 가장 많은 국가임.
   if (ranking.length > 0) {
-    // 1위 국가의 영화 수를 최댓값으로 사용함. 다른 국가는 이 값에 대한 비율로 크기가 정해짐.
+    // 1위 국가의 영화 수를 최댓값으로 사용함. 다른 국가는 이 값에 대한 비율로 막대 길이가 정해짐.
     maxCount = ranking[0].movie_ids.length;
   }
 
@@ -227,7 +227,8 @@ function renderMap(context) {
   // el의 두 번째 인수 {}는 따로 지정할 속성이 없다는 뜻임.
   const pageTitle = el('h1', {}, '영화 지도');
   // p는 페이지 내용을 설명하는 문단이며 muted는 이 문단을 구분하기 위한 클래스임.
-  const description = el('p', { className: 'muted' }, '영화의 제작 국가를 지도 위의 핀으로 보여줍니다. 핀이 클수록 해당 국가의 영화가 많습니다.');
+  // 두 번째 문장은 핀을 누르면 오른쪽(좁은 화면에서는 지도 아래) 국가 영역에 그 국가의 영화 목록이 나타난다는 안내임.
+  const description = el('p', { className: 'muted' }, '영화의 제작 국가를 지도 위의 핀으로 보여줍니다. 핀을 누르면 그 국가의 영화 목록을 볼 수 있습니다.');
   // append(요소1, 요소2)는 부모의 맨 뒤에 자식을 적은 순서대로 추가함.
   // 결과: heading(div) 안에 pageTitle(h1), description(p)이 그 순서로 들어감.
   heading.append(pageTitle, description);
@@ -309,8 +310,9 @@ function renderMap(context) {
     id: 'map-mode-watched',
     // 이 버튼은 폼을 제출하지 않고 아래에 등록한 모드 전환만 실행함.
     type: 'button',
-    // button과 secondary라는 클래스 두 개를 붙임. 클릭 동작은 클래스가 아니라 이벤트가 정함.
-    className: 'button secondary'
+    // btn과 btn-link는 Bootstrap의 글자 버튼 모양 클래스임. 클릭 동작은 클래스가 아니라 이벤트가 정함.
+    // 아래에서 aria-pressed를 붙이므로 common.css가 탭처럼(선택 시 굵은 글자 + 주황 밑줄 막대) 보여줌.
+    className: 'btn btn-link'
   }, '감상한 영화');
   // 전체 영화 기준으로 바꿀 button 요소를 별도로 만듦. watchedButton과는 다른 DOM 객체임.
   const allButton = el('button', {
@@ -319,11 +321,12 @@ function renderMap(context) {
     // 폼을 제출하지 않는 일반 버튼임.
     type: 'button',
     // '감상한 영화' 버튼과 같은 CSS 클래스들을 적용함.
-    className: 'button secondary'
+    className: 'btn btn-link'
   }, '등록된 전체 영화');
   // aria-pressed는 토글 버튼이 눌린(선택된) 상태인지 보조 기술에 알려주는 속성임.
   // String(mode === 'watched')는 비교 결과 true/false를 문자열 'true'/'false'로 바꿈.
-  // map.css는 [aria-pressed="true"]인 모드 버튼의 테두리를 두껍게, 글자를 굵게 표시함.
+  // common.css의 '.btn-link[aria-pressed="true"]' 규칙이 이 값을 보고 선택된 모드 버튼만 굵은 글자 + 주황 밑줄 막대로 표시함.
+  // 모드 버튼의 선택 모양은 map.css가 아니라 common.css가 담당함.
   watchedButton.setAttribute('aria-pressed', String(mode === 'watched'));
   // 두 버튼 중 현재 모드에 해당하는 버튼 하나만 'true'가 됨.
   allButton.setAttribute('aria-pressed', String(mode === 'all'));
@@ -358,17 +361,37 @@ function renderMap(context) {
   // 핀이 이미지 위에 겹쳐 보이는 것은 map.css가 핀에 position: absolute를 지정했기 때문이며 DOM 순서 때문이 아님.
   canvas.append(mapImage);
 
+  // 가까이 붙은 국가의 핀이 서로 가리지 않도록, 핀 머리를 기울일 국가를 미리 고름.
+  // 예: 대한민국(경도 127.8)과 일본(경도 138.3)은 경도 차이가 10.5도뿐이라 휴대폰 너비 지도에서는 약 10px 거리임.
+  // 이때 서쪽 핀(대한민국)은 왼쪽으로, 동쪽 핀(일본)은 오른쪽으로 머리를 기울임. 뾰족한 끝은 원래 좌표에 그대로 둠.
+  // leanWest는 왼쪽으로 기울일 국가 코드, leanEast는 오른쪽으로 기울일 국가 코드를 담는 Set임.
+  const leanWest = new Set();
+  const leanEast = new Set();
+  // 국가 두 개씩 모든 짝을 비교함. west는 서쪽 후보, east는 동쪽 후보임.
+  for (const west of ranking) {
+    for (const east of ranking) {
+      // 경도 차이임. 양수이면 east가 west보다 동쪽(지도에서 오른쪽)에 있음.
+      const lngGap = east.country.pin_lng - west.country.pin_lng;
+      // 위도 차이의 크기임. Math.abs는 음수를 양수로 바꿔 절댓값을 돌려줌.
+      const latGap = Math.abs(east.country.pin_lat - west.country.pin_lat);
+      // 동쪽으로 20도 미만, 위아래로 15도 미만이면 가까운 핀으로 봄.
+      // lngGap > 0 조건 때문에 같은 국가끼리의 비교(차이 0)와 반대 방향 짝은 건너뜀.
+      if (lngGap > 0 && lngGap < 20 && latGap < 15) {
+        leanWest.add(west.country.country_code);
+        leanEast.add(east.country.country_code);
+      }
+    }
+  }
+
   // 순위에 들어간 국가마다 핀 버튼 하나를 만듦.
   for (const entry of ranking) {
     // 이번 항목의 국가 객체임. 예: { country_code: 'KR', name: '대한민국', pin_lat: 36.3, pin_lng: 127.8 }.
     const country = entry.country;
-    // 이 국가의 영화 수임. 핀 안의 숫자와 핀 크기에 사용함.
+    // 이 국가의 영화 수임. 보조 기술용 이름(aria-label)과 핀 아래 이름표 글자에만 사용함.
+    // 핀 자체에는 숫자를 쓰지 않고, 핀 크기도 영화 수와 상관없이 map.css가 정한 한 가지 크기로 같음.
     const count = entry.movie_ids.length;
     // catalog의 핀 좌표를 지도 위의 % 위치로 바꿈.
     const position = toMapPosition(country.pin_lat, country.pin_lng);
-    // 핀 크기(px)는 26에 0~18을 더한 값이라 26~44px 사이가 됨. 1위 국가의 핀이 44px로 가장 큼.
-    // Math.round는 가장 가까운 정수로 반올림함. 예: 최대 10편 중 5편이면 26 + 9 = 35.
-    const size = 26 + Math.round(18 * count / maxCount);
     // 국가마다 다른 id임. 예: 'map-pin-KR'. 갱신 뒤 같은 핀으로 초점을 돌려놓을 때 사용함.
     const pinId = 'map-pin-' + country.country_code;
 
@@ -378,10 +401,10 @@ function renderMap(context) {
       id: pinId,
       // 폼을 제출하지 않는 일반 버튼임.
       type: 'button',
-      // map.css의 '.map-canvas .map-pin' 규칙이 공통 버튼의 테두리·여백·최소 크기를 지워 --size 크기의 투명한 상자로 만듦.
+      // map.css의 '.map-canvas .map-pin' 규칙이 공통 버튼의 테두리·여백·최소 크기를 지워 --map-pin-size 크기의 투명한 상자로 만듦.
       // 눈에 보이는 핀 모양은 안쪽의 map-pin-head가 그림.
       className: 'map-pin',
-      // 핀 안에는 숫자만 보이므로 국가 이름과 영화 수를 한 문장으로 보조 기술에 알려줌.
+      // 핀에는 글자가 없으므로 국가 이름과 영화 수를 한 문장으로 보조 기술에 알려줌.
       ariaLabel: `${country.name}, 영화 ${count}편`
     });
     // style.left는 요소에 직접 넣는 인라인 스타일임. 숫자 뒤에 '%'를 붙여 '85.5%' 같은 CSS 값을 만듦.
@@ -391,19 +414,19 @@ function renderMap(context) {
     // left/top은 상자의 왼쪽 위 모서리를 이 좌표에 놓음. 뾰족한 끝을 좌표에 맞추는 일은 map.css가 담당함.
     // map.css의 translate(-50%, -120.7%)가 상자를 너비의 절반만큼 왼쪽, 높이의 120.7%만큼 위로 옮김.
     pin.style.top = position.top + '%';
-    // setProperty('--size', 값)는 CSS 사용자 정의 속성(변수)을 이 요소에만 지정함.
-    // --로 시작하는 사용자 정의 속성은 style.backgroundColor 같은 전용 속성 이름이 없음.
-    // style.size나 style['--size']로 대입해도 CSS에 반영되지 않으므로 setProperty를 사용함.
-    // map.css가 width: var(--size), height: var(--size)로 이 값을 읽어 핀마다 다른 크기를 적용함.
-    pin.style.setProperty('--size', size + 'px');
+    // 서쪽 이웃만 있는 핀은 오른쪽(map-pin-east), 동쪽 이웃만 있는 핀은 왼쪽(map-pin-west)으로 기울임.
+    // 양쪽에 모두 이웃이 있는 가운데 핀은 똑바로 둠. !는 참·거짓을 뒤집는 연산자임.
+    // 실제 기울이기는 map.css가 --map-lean·--map-lean-x·--map-lean-y 값으로 처리함.
+    if (leanWest.has(country.country_code) && !leanEast.has(country.country_code)) {
+      pin.classList.add('map-pin-west');
+    }
+    if (leanEast.has(country.country_code) && !leanWest.has(country.country_code)) {
+      pin.classList.add('map-pin-east');
+    }
 
-    // pinHead는 물방울 모양 핀 머리임. map.css가 정사각형을 -45도 돌려 뾰족한 모서리가 아래를 향하게 함.
+    // pinHead는 핀 머리임. 안에 글자나 자식 요소 없이 빈 span으로 둠.
+    // 물방울 모양과 가운데의 둥근 점은 map.css가 ::before로 그림. 정사각형을 -45도 돌려 뾰족한 모서리가 아래를 향하게 함.
     const pinHead = el('span', { className: 'map-pin-head' });
-    // 핀 머리 안에 표시할 영화 수 숫자임. String(count)로 숫자를 글자로 바꿔 넣음.
-    // 부모가 -45도 돌아가 있으므로 map.css가 이 span을 +45도 되돌려 숫자가 똑바로 보이게 함.
-    const pinCount = el('span', { className: 'map-pin-count' }, String(count));
-    // 결과: pinHead(span) → pinCount(span).
-    pinHead.append(pinCount);
     // 핀 아래에 뜨는 이름표임. 예: '대한민국 · 3편'.
     // map.css가 평소에는 숨기고 마우스를 올렸을 때·키보드 초점·선택 상태에서만 보여줌.
     const pinLabel = el('span', { className: 'map-pin-label' }, `${country.name} · ${count}편`);
@@ -415,7 +438,7 @@ function renderMap(context) {
       // classList.add는 기존 클래스를 지우지 않고 클래스 이름 하나를 추가함.
       // selected는 선택한 핀을 구분하는 클래스임. 현재 map.css의 강조는 aria-pressed="true"를 기준으로 함.
       pin.classList.add('selected');
-      // 선택 상태를 CSS와 보조 기술에 모두 전달함. map.css는 이 핀 머리의 테두리를 두껍게, 크기를 조금 크게 하고 이름표를 보여줌.
+      // 선택 상태를 CSS와 보조 기술에 모두 전달함. map.css는 이 핀 머리를 검게 칠하고 가운데 점을 주황으로 바꾸며, 크기를 조금 크게 하고 이름표를 보여줌.
       pin.setAttribute('aria-pressed', 'true');
     } else {
       // 선택하지 않은 나머지 핀도 상태를 명시하여 '선택 안 됨'으로 표시함.
@@ -432,7 +455,7 @@ function renderMap(context) {
     pin.addEventListener('click', selectPin);
     // 완성한 핀을 canvas에 붙임. position: absolute인 핀은 순서와 상관없이 위치 지정이 없는 지도 이미지보다 위에 그려짐.
     // 핀끼리 겹치면 나중에 붙인 핀(순위가 낮은 국가)이 위에 옴.
-    // 마우스를 올린 핀·키보드 초점을 받은 핀·선택된 핀은 map.css의 z-index: 1로 맨 위에 옴.
+    // 마우스를 올린 핀·키보드 초점을 받은 핀·선택된 핀은 map.css의 z-index: 2로 다른 핀(z-index 1)보다 위에 옴.
     canvas.append(pin);
   }
 
@@ -445,14 +468,14 @@ function renderMap(context) {
 
   // 감상한 영화 모드에서 핀이 하나도 없으면(주로 감상 기록이 아직 없을 때) 다음 행동을 안내함.
   if (ranking.length === 0 && mode === 'watched') {
-    // 공통 CSS에서 점선 테두리와 간격을 지정한 empty-state를 적용함.
+    // 공통 CSS에서 옅은 회색 바탕과 간격을 지정한 empty-state를 적용함.
     const empty = el('div', { className: 'empty-state' });
     // 핀이 없는 이유를 설명하는 문단임.
     const emptyMessage = el('p', {}, '아직 감상 기록이 없어 지도에 표시할 핀이 없습니다.');
-    // 메인 페이지로 가는 링크임. button 클래스로 버튼처럼 보이지만 실제로는 a 요소임.
-    const homeLink = el('a', { href: 'index.html', className: 'button' }, '메인 페이지로 이동');
+    // 메인 페이지로 가는 링크임. btn btn-link 클래스로 글자 버튼처럼 보이지만 실제로는 a 요소임.
+    const homeLink = el('a', { href: 'index.html', className: 'btn btn-link' }, '메인 페이지로 이동');
     // 기록이 없어도 지도를 사용해 볼 수 있도록 전체 영화 모드로 바꾸는 버튼임.
-    const allMoviesButton = el('button', { type: 'button', className: 'button secondary' }, '등록된 전체 영화로 보기');
+    const allMoviesButton = el('button', { type: 'button', className: 'btn btn-link' }, '등록된 전체 영화로 보기');
     // 위의 '등록된 전체 영화' 버튼과 같은 showAll을 연결함. 갱신 뒤 초점은 'map-mode-all' 버튼으로 감.
     allMoviesButton.addEventListener('click', showAll);
     // 결과: empty(div) → [emptyMessage(p), homeLink(a), allMoviesButton(button)].
@@ -508,7 +531,7 @@ function renderMap(context) {
     let posterUrl = 'assets/posters/placeholder.jpg';
     // poster_url이 null이 아니면 영화에 등록된 포스터 경로를 사용함.
     if (movie.poster_url !== null) {
-      // 예: 'assets/posters/m001.jpg'.
+      // 예: 'https://image.tmdb.org/t/p/w500/jjHccoFjbqlfr4VGLVLT7yek0Xn.jpg'.
       posterUrl = movie.poster_url;
     }
     // 개봉일이 없을 때 보여줄 기본 문구임.
@@ -568,8 +591,8 @@ function renderMap(context) {
     // 순위 버튼의 국가별 id임. 예: 'map-rank-KR'. 핀의 id와 겹치지 않도록 앞부분을 다르게 함.
     const rankId = 'map-rank-' + country.country_code;
 
-    // 클래스 없이 만든 일반 버튼임. 기본 테두리·여백은 common.css의 button 규칙이 정함.
-    // 가로 배치·전체 너비·회색 테두리는 map.css의 '.map-rank-list button' 규칙이 정함.
+    // 클래스 없이 만든 일반 버튼임. 모양은 map.css의 '.map-rank-list button' 규칙이 정함.
+    // 이 규칙은 브라우저 기본 테두리를 지우고 여백을 새로 정한 뒤, 전체 너비의 가로 배치, 아래쪽 연회색 구분선, 투명한 왼쪽 4px 테두리를 지정함.
     const rankButton = el('button', { id: rankId, type: 'button' });
     // 국가 이름을 담는 span임.
     const rankName = el('span', { className: 'map-rank-name' }, country.name);
@@ -586,7 +609,7 @@ function renderMap(context) {
     if (country.country_code === selectedCode) {
       // selected 클래스를 추가함. map.css의 강조는 아래 aria-pressed 값을 기준으로 함.
       rankButton.classList.add('selected');
-      // map.css가 이 버튼의 테두리를 연한 회색에서 글자색으로 바꾸고 글자를 굵게 표시함.
+      // map.css가 이 버튼의 투명한 왼쪽 4px 테두리를 글자색(--color-ink)으로 칠하고, 연회색 바탕과 굵은 글자로 표시함.
       rankButton.setAttribute('aria-pressed', 'true');
     } else {
       // 선택하지 않은 순위 버튼도 상태를 명시하여 '선택 안 됨'으로 표시함.

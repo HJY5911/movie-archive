@@ -158,8 +158,8 @@ function renderCalendar(context) {
     id: 'calendar-previous',
     // 이 버튼은 폼을 제출하지 않고 아래에 등록한 월 이동만 실행함.
     type: 'button',
-    // button과 secondary라는 클래스 두 개를 붙임. 클릭 동작은 클래스가 아니라 이벤트가 정함.
-    className: 'button secondary',
+    // btn과 btn-link는 Bootstrap의 글자 버튼 모양 클래스임. 클릭 동작은 클래스가 아니라 이벤트가 정함.
+    className: 'btn btn-link',
     // 버튼의 목적을 보조 기술에 전달함.
     ariaLabel: '이전 달'
   }, '이전 달');
@@ -170,7 +170,7 @@ function renderCalendar(context) {
     // 검색이나 기록 폼을 제출하지 않는 일반 버튼임.
     type: 'button',
     // 이전 달 버튼과 같은 CSS 클래스들을 적용함.
-    className: 'button secondary',
+    className: 'btn btn-link',
     // 표시 글자와 함께 다음 달 이동 버튼임을 알려줌.
     ariaLabel: '다음 달'
   }, '다음 달');

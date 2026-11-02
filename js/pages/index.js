@@ -21,6 +21,7 @@ boot({
     id: 'movie-search',
     type: 'search',
     name: 'q',
+    className: 'form-control',
     placeholder: '영화 제목, 배우 또는 감독을 검색하세요',
     ariaLabel: '영화 검색어'
   });
@@ -28,7 +29,7 @@ boot({
   form.append(
     el('label', { htmlFor: 'movie-search' }, '영화 검색'),
     input,
-    el('button', { className: 'button', type: 'submit' }, '검색')
+    el('button', { className: 'btn btn-primary', type: 'submit' }, '검색')
   );
 
   form.addEventListener('submit', (event) => {
@@ -58,7 +59,7 @@ boot({
     ));
   }
 
-  const recent = el('section', { className: 'page-section' },
+  const recent = el('section', { className: 'page-section index-shelf' },
     el('div', { className: 'section-heading' },
       el('h2', {}, '최근 감상 기록'),
       el('a', { href: 'calendar.html', className: 'text-link' }, '캘린더로 이동')
@@ -69,11 +70,11 @@ boot({
     const empty = el('div', { className: 'empty-state' },
       el('h3', {}, '감상 기록이 없습니다'),
       el('p', {}, '예시 기록 버튼으로 저장과 감상 요약을 확인할 수 있습니다.'),
-      el('a', { href: 'movies.html', className: 'button' }, '영화 검색 페이지로 이동')
+      el('a', { href: 'movies.html', className: 'btn btn-link' }, '영화 검색 페이지로 이동')
     );
     const sampleButton = el('button', {
       type: 'button',
-      className: 'button secondary'
+      className: 'btn btn-link'
     }, '예시 감상 기록 6개 넣어보기');
 
     sampleButton.disabled = catalog.Movie.length === 0;
@@ -115,7 +116,7 @@ boot({
     empty.append(sampleButton);
     recent.append(empty);
   } else {
-    const cards = el('div', { className: 'card-grid' });
+    const cards = el('div', { className: 'card-grid index-recent-grid' });
 
     const logs = snapshot.logs.slice(0, 4);
 
@@ -129,7 +130,7 @@ boot({
     recent.append(cards);
   }
 
-  const explore = el('section', { className: 'page-section' },
+  const explore = el('section', { className: 'page-section index-shelf' },
     el('div', { className: 'section-heading' },
       el('h2', {}, '영화 목록'),
       el('a', { href: 'movies.html', className: 'text-link' }, '전체 영화 보기')
