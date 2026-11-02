@@ -185,6 +185,18 @@ function mountDataCredit() {
   footer.append(el('p', { className: 'small mt-2' }, '포스터·영화 정보 일부 출처: ', link, ' · 이 사이트는 TMDB의 승인·인증을 받지 않았습니다.'));
 }
 
+function usePlaceholderPoster(event) {
+  const image = event.target;
+  if (image.tagName !== 'IMG') {
+    return;
+  }
+  const url = new URL(image.src, location.href);
+  if (url.origin === location.origin) {
+    return;
+  }
+  image.src = 'assets/posters/placeholder.jpg';
+}
+
 function mountShell(page) {
   const nav = el('nav', { className: 'navbar navbar-expand site-navbar', ariaLabel: '주 메뉴', dataset: { bsTheme: 'dark' } });
   const shell = el('div', { className: 'container-xl' });
@@ -215,6 +227,7 @@ function mountShell(page) {
   const messages = document.querySelector('#messages');
   if (messages) topbar.append(messages);
   mountDataCredit();
+  document.addEventListener('error', usePlaceholderPoster, true);
 }
 
 export async function boot({ page, title, render }) {

@@ -424,6 +424,31 @@ function mountDataCredit() {
 }
 
 /*
+ * usePlaceholderPoster(event): 다른 사이트에서 불러오는 포스터가 실패하면 기본 포스터로 바꿈.
+ * 영화 포스터는 TMDB 주소에서 불러오므로 인터넷이 끊기거나 주소가 막히면 깨진 그림 아이콘이 보임.
+ * 그럴 때 저장소 안의 assets/posters/placeholder.jpg로 바꿔 빈 칸 대신 기본 포스터를 보여줌.
+ * img의 error 이벤트는 부모로 전달(버블링)되지 않으므로 mountShell()이 document에 '캡처 단계'로 등록함.
+ * 캡처 단계에서는 이벤트가 대상 img에 닿기 전에 document를 먼저 지나가므로, 페이지의 모든 img 실패를 한 곳에서 받을 수 있음.
+ * 영화 자료에 따라 달라지지 않도록 특정 주소(TMDB)를 적지 않고 '이 사이트와 다른 출처의 그림'만 바꿈.
+ * 이 사이트 안의 그림(지도, 기본 포스터)과 사진 보관함 사진(blob: 주소, 출처는 이 사이트)은 바꾸지 않음.
+ * 기본 포스터는 같은 출처라서, 기본 포스터마저 실패해도 다시 바꾸지 않아 반복되지 않음.
+ */
+function usePlaceholderPoster(event) {
+  // 캡처 단계에서는 그림 말고 다른 요소(script 등)의 error 이벤트도 지나가므로 img만 처리함.
+  const image = event.target;
+  if (image.tagName !== 'IMG') {
+    return;
+  }
+  // new URL(주소, 기준)은 상대 주소도 완전한 주소로 바꿔 줌. origin은 '프로토콜://호스트:포트' 부분임.
+  const url = new URL(image.src, location.href);
+  // 이 사이트와 같은 출처의 그림이면 그대로 둠.
+  if (url.origin === location.origin) {
+    return;
+  }
+  image.src = 'assets/posters/placeholder.jpg';
+}
+
+/*
  * mountShell(page): 공통 메뉴와 저장 위치 안내를 HTML의 빈 자리들에 넣음.
  * page는 'index', 'calendar'처럼 현재 페이지를 구분하는 값임.
  * export가 없으므로 다른 모듈에서 직접 가져올 수 없고, 아래 boot()가 내부에서 호출함.
@@ -493,6 +518,9 @@ function mountShell(page) {
   if (messages) topbar.append(messages);
   // 마지막으로 바닥글에 자료 출처 줄을 붙임. 바닥글은 본문 아래라 메뉴·본문 준비에 영향이 없음.
   mountDataCredit();
+  // 포스터가 실패하면 기본 포스터로 바꾸도록 등록함. 세 번째 인자 true는 캡처 단계에서 받겠다는 뜻임.
+  // 본문(render)이 그림을 만들기 전에 등록되므로 처음 그리는 포스터부터 적용됨.
+  document.addEventListener('error', usePlaceholderPoster, true);
 }
 
 /*

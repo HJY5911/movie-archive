@@ -42,6 +42,13 @@ function formatRuntime(minutes) {
 }
 
 function objectParticle(word) {
+  const last = word.charAt(word.length - 1);
+  if ('0123456789'.includes(last)) {
+    if ('2459'.includes(last)) {
+      return '를';
+    }
+    return '을';
+  }
   const code = word.charCodeAt(word.length - 1);
   if (code < 0xAC00 || code > 0xD7A3) {
     return '을(를)';
