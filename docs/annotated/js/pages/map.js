@@ -181,6 +181,206 @@ function startCrosshair(stage) {
 }
 
 /*
+ * 펼친 핀의 국가 이름표 배치
+ *
+ * 유럽처럼 가까운 나라가 많으면 map-layout.js가 핀을 빈 자리로 옮겨 펼침(연결선 끝의 점이 실제 위치임).
+ * 그런데 이탈리아 핀이 아프리카 위에 놓이는 식으로 다른 대륙까지 밀리면, 이름 없이는 아프리카 영화로 오해하기 쉬움.
+ * 그래서 옮겨진 핀(펼친 핀)에는 국가 이름표를 항상 보여주고, 이름표가 다른 핀·이름표·실제 위치 점을 가리지 않는 자리를 고름.
+ *
+ * 좌표는 모두 지도(canvas) 왼쪽 위를 (0, 0)으로 하는 px 값임.
+ * position은 arrangeMapPins()가 돌려준 핀 하나의 배치 정보임.
+ *   x: 핀 가운데의 가로 위치, y: 둥근 머리 가운데의 세로 위치, size: 핀 너비(px)임.
+ *   뾰족한 끝은 머리 가운데에서 size × 0.707만큼 아래에 있음(map.css에서 정사각형을 45도 돌린 모양이기 때문임).
+ * 상자(box)는 { left, right, top, bottom } 네 값으로 나타냄.
+ */
+
+// 이름표를 놓아 볼 후보 자리 8곳임. 앞에 있을수록 먼저 고려함(아래 → 오른쪽 → 왼쪽 → 위 → 대각선 네 곳).
+const labelSides = ['below', 'right', 'left', 'above', 'below-right', 'below-left', 'above-right', 'above-left'];
+// 핀과 이름표 사이의 간격(px)임. 너무 멀면 어느 핀의 이름인지 헷갈리므로 붙어 보일 만큼만 띄움.
+const labelGap = 4;
+
+// pinBox(position): 핀 하나가 차지하는 상자를 구함. 둥근 머리 위쪽부터 뾰족한 끝까지이고, 사방으로 2px 여유를 둠.
+function pinBox(position) {
+  return {
+    left: position.x - position.size / 2 - 2,
+    right: position.x + position.size / 2 + 2,
+    top: position.y - position.size / 2 - 2,
+    bottom: position.y + position.size * 0.707 + 2
+  };
+}
+
+/*
+ * labelBox(side, position, width, height): 후보 자리 side에 너비 width, 높이 height인 이름표를 놓았을 때의 상자를 구함.
+ * 기본값은 'below'(뾰족한 끝 아래 가운데)이고, side에 따라 left·top만 바꿈.
+ * 대각선 자리는 둥근 머리의 45도 방향 바깥(가운데에서 size × 0.36 + 간격)에 이름표 모서리를 맞춤.
+ */
+function labelBox(side, position, width, height) {
+  // 둥근 머리의 반지름임.
+  const half = position.size / 2;
+  // 대각선 자리에서 머리 가운데부터 이름표 모서리까지의 가로·세로 거리임.
+  const corner = position.size * 0.36 + labelGap;
+  // 아래(below): 가로는 핀 가운데에 맞추고, 세로는 뾰족한 끝 바로 아래에 둠.
+  let left = position.x - width / 2;
+  let top = position.y + position.size * 0.707 + labelGap;
+  // 위(above): 둥근 머리 위쪽 끝보다 위에 둠.
+  if (side === 'above') {
+    top = position.y - half - labelGap - height;
+  }
+  // 오른쪽·왼쪽: 머리 옆에 두고, 세로 가운데를 머리 가운데에 맞춤.
+  if (side === 'right') {
+    left = position.x + half + labelGap;
+    top = position.y - height / 2;
+  }
+  if (side === 'left') {
+    left = position.x - half - labelGap - width;
+    top = position.y - height / 2;
+  }
+  // 대각선 네 곳은 가로(오른쪽/왼쪽)와 세로(아래/위)를 따로 정함.
+  if (side === 'below-right' || side === 'above-right') {
+    left = position.x + corner;
+  }
+  if (side === 'below-left' || side === 'above-left') {
+    left = position.x - corner - width;
+  }
+  if (side === 'below-right' || side === 'below-left') {
+    top = position.y + corner;
+  }
+  if (side === 'above-right' || side === 'above-left') {
+    top = position.y - corner - height;
+  }
+  return { left: left, right: left + width, top: top, bottom: top + height };
+}
+
+// boxesOverlap(a, b): 두 상자가 조금이라도 겹치면 true임. 가로와 세로 범위가 둘 다 겹쳐야 겹친 것임.
+function boxesOverlap(a, b) {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
+// lineCrossesBox(line, box): 연결선이 상자를 지나가면 true임.
+// 선분 위의 점 21개(양 끝 포함, 1/20 간격)를 차례로 확인하는 간단한 방법을 씀.
+function lineCrossesBox(line, box) {
+  for (let step = 0; step <= 20; step += 1) {
+    const x = line.x1 + (line.x2 - line.x1) * step / 20;
+    const y = line.y1 + (line.y2 - line.y1) * step / 20;
+    if (x > box.left && x < box.right && y > box.top && y < box.bottom) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// distanceToBox(x, y, box): 점 (x, y)에서 상자의 가장 가까운 지점까지의 거리임. 점이 상자 안에 있으면 0임.
+function distanceToBox(x, y, box) {
+  const dx = Math.max(box.left - x, 0, x - box.right);
+  const dy = Math.max(box.top - y, 0, y - box.bottom);
+  return Math.hypot(dx, dy);
+}
+
+/*
+ * labelCost(box, own, positions, width, obstacles, lines): 이름표 상자 box가 얼마나 나쁜 자리인지 점수로 매김. 작을수록 좋음.
+ * own: 이름표 주인 핀, positions: 모든 핀, width: 지도 너비(높이는 그 절반), obstacles: 가리면 안 되는 상자들, lines: 연결선들임.
+ * 점수는 문제의 무게 순서로 크게 차이 나게 줌.
+ *   지도 밖으로 나감 10000 > 다른 핀·이름표·실제 위치 점을 가림 1000(하나마다)
+ *   > 다른 핀이 주인 핀보다 이름표에 더 가까워 헷갈림 100(하나마다) > 연결선 위에 놓임 10(하나마다)
+ */
+function labelCost(box, own, positions, width, obstacles, lines) {
+  const ownDistance = distanceToBox(own.x, own.y, box);
+  let cost = 0;
+  if (box.left < 0 || box.top < 0 || box.right > width || box.bottom > width / 2) {
+    cost += 10000;
+  }
+  for (const other of obstacles) {
+    if (boxesOverlap(box, other)) {
+      cost += 1000;
+    }
+  }
+  for (const other of positions) {
+    if (other !== own && distanceToBox(other.x, other.y, box) < ownDistance) {
+      cost += 100;
+    }
+  }
+  for (const line of lines) {
+    if (lineCrossesBox(line, box)) {
+      cost += 10;
+    }
+  }
+  return cost;
+}
+
+/*
+ * moveLabel(label, side, box, position): 고른 자리로 이름표를 옮김.
+ * 이름표는 핀 버튼 안의 position: absolute 요소이므로, 지도 기준 좌표를 핀 버튼 왼쪽 위 기준 값으로 바꿔 style에 넣음.
+ * 핀 버튼 상자는 둥근 머리와 같은 크기(size × size)이고, 왼쪽 위가 (x - size / 2, y - size / 2)임.
+ */
+function moveLabel(label, side, box, position) {
+  const buttonLeft = position.x - position.size / 2;
+  const buttonTop = position.y - position.size / 2;
+  label.style.top = (box.top - buttonTop) + 'px';
+  // 아래·위 자리는 map.css의 기본 가로 배치(left: 50%, 가운데 맞춤)를 그대로 씀.
+  if (side === 'below' || side === 'above') {
+    return;
+  }
+  // 그 밖의 자리는 가운데 맞춤 이동(transform)을 끄고 가로 위치를 직접 정함.
+  label.style.transform = 'none';
+  // 핀 왼쪽에 놓는 이름표는 오른쪽 끝(right)을 고정함.
+  // 마우스를 올리면 이름표에 ' · 3편'이 붙어 길어지는데, 이때 핀 쪽이 아니라 바깥(왼쪽)으로 늘어나게 하기 위함임.
+  if (side === 'left' || side === 'below-left' || side === 'above-left') {
+    label.style.left = 'auto';
+    label.style.right = (buttonLeft + position.size - box.right) + 'px';
+    return;
+  }
+  label.style.left = (box.left - buttonLeft) + 'px';
+}
+
+// sort()에 넘기는 비교 함수임. 빈 후보 자리가 적은 핀이 앞에 오도록 오름차순으로 정렬함.
+function compareFreeSides(a, b) {
+  return a.freeSides - b.freeSides;
+}
+
+/*
+ * placeLabels(spreadPositions, positions, pinByCode, width, obstacles, lines): 펼친 핀마다 이름표 자리를 정함.
+ * spreadPositions: 옮겨진 핀들, positions: 모든 핀, pinByCode: 국가 코드 → 핀 정보 객체임.
+ * obstacles에는 처음에 모든 핀과 실제 위치 점이 들어 있고, 이름표 자리를 정할 때마다 그 상자를 더함.
+ * 그래서 나중에 정하는 이름표는 먼저 정한 이름표를 피함.
+ */
+function placeLabels(spreadPositions, positions, pinByCode, width, obstacles, lines) {
+  const jobs = [];
+  for (const position of spreadPositions) {
+    const label = pinByCode[position.code].button.querySelector('.map-pin-label');
+    // visibility: hidden 상태여도 크기는 계산되므로 offsetWidth·offsetHeight로 이름표 크기를 읽음.
+    const job = { position: position, label: label, width: label.offsetWidth, height: label.offsetHeight, freeSides: 0 };
+    // 다른 이름표를 놓기 전 상태에서 문제없는(점수 100 미만) 후보 자리가 몇 곳인지 셈.
+    for (const side of labelSides) {
+      if (labelCost(labelBox(side, position, job.width, job.height), position, positions, width, obstacles, lines) < 100) {
+        job.freeSides += 1;
+      }
+    }
+    jobs.push(job);
+  }
+  // 빈 자리가 적어 고르기 어려운 핀부터 자리를 정함. 여유가 많은 핀이 먼저 좋은 자리를 차지해 버리는 일을 줄임.
+  jobs.sort(compareFreeSides);
+
+  for (const job of jobs) {
+    // 8곳 중 점수가 가장 낮은 자리를 고름. 점수가 같으면 labelSides에서 앞선 자리를 그대로 둠.
+    let bestSide = labelSides[0];
+    let bestBox = null;
+    let bestCost = Infinity;
+    for (const side of labelSides) {
+      const box = labelBox(side, job.position, job.width, job.height);
+      const cost = labelCost(box, job.position, positions, width, obstacles, lines);
+      if (cost < bestCost) {
+        bestSide = side;
+        bestBox = box;
+        bestCost = cost;
+      }
+    }
+    moveLabel(job.label, bestSide, bestBox, job.position);
+    // 고른 이름표 상자는 다음 이름표가 피해야 할 장애물이 됨.
+    obstacles.push(bestBox);
+  }
+}
+
+/*
  * moviesByCountry(catalog, logs): 현재 mode에 맞는 국가 코드별 영화 ID 목록을 만듦.
  * catalog: 영화 기본 자료, logs: 현재 프로필의 감상 기록 배열임.
  * 반환값: { 국가 코드: [영화 ID, ...] } 형태의 객체임. 영화가 없는 국가는 항목 자체가 없음.
@@ -537,7 +737,10 @@ function renderMap(context) {
     const pinHead = el('span', { className: 'map-pin-head' });
     // 핀 아래에 뜨는 이름표임. 예: '대한민국 · 3편'.
     // map.css가 평소에는 숨기고 마우스를 올렸을 때·키보드 초점·선택 상태에서만 보여줌.
-    const pinLabel = el('span', { className: 'map-pin-label' }, `${country.name} · ${count}편`);
+    // 펼친 핀(옮겨진 핀)은 이름표를 항상 보여주되, 평소에는 국가 이름만 보이도록 ' · 3편' 부분을 따로 span에 넣음.
+    // 이름표 전체 글자(textContent)는 그대로 '대한민국 · 3편'이므로 조준선 안내 글자(mapReadout)도 바뀌지 않음.
+    const pinCount = el('span', { className: 'map-pin-count' }, ` · ${count}편`);
+    const pinLabel = el('span', { className: 'map-pin-label' }, country.name, pinCount);
     // 결과: pin(button) → [pinHead(span), pinLabel(span)].
     pin.append(pinHead, pinLabel);
     // 겹침 계산에 쓸 핀 정보임. size는 화면에 붙인 뒤 positionPins()가 실제 핀 너비로 채움.
@@ -587,15 +790,34 @@ function renderMap(context) {
     canvas.style.width = width + 'px';
     connections.setAttribute('viewBox', '0 0 ' + width + ' ' + width / 2);
     connections.replaceChildren();
+    // 이름표 자리를 정할 때 쓸 목록임. obstacles: 가리면 안 되는 상자, lines: 연결선, spreadPositions: 옮겨진 핀.
+    const obstacles = [];
+    const lines = [];
+    const spreadPositions = [];
     for (const position of positions) {
       const pin = pinByCode[position.code];
       const tipY = position.y + position.size * 0.707;
       pin.button.style.left = position.x + 'px';
       pin.button.style.top = tipY + 'px';
+      // 화면 폭이 바뀌어 다시 배치할 때를 위해, 지난번에 붙인 펼침 표시와 이름표 위치(style)를 먼저 지움.
+      const label = pin.button.querySelector('.map-pin-label');
+      pin.button.classList.remove('map-pin-spread');
+      label.removeAttribute('style');
+      obstacles.push(pinBox(position));
       // 거의 옮기지 않은 핀(1px 미만)은 연결선을 그리지 않음.
+      // 다만 선택된 핀은 아래에 이름표가 항상 보이므로, 다른 이름표가 그 자리를 가리지 않도록 장애물에 넣음.
       if (Math.hypot(position.x - position.anchorX, tipY - position.anchorY) < 1) {
+        if (position.code === selectedCode) {
+          obstacles.push(labelBox('below', position, label.offsetWidth, label.offsetHeight));
+        }
         continue;
       }
+      // 옮겨진 핀에는 map-pin-spread를 붙여 map.css가 이름표를 항상 보여주게 함.
+      pin.button.classList.add('map-pin-spread');
+      spreadPositions.push(position);
+      lines.push({ x1: position.anchorX, y1: position.anchorY, x2: position.x, y2: tipY });
+      // 실제 위치 점(반지름 3px)도 이름표가 가리지 않도록 가로·세로 10px 상자로 장애물에 넣음.
+      obstacles.push({ left: position.anchorX - 5, right: position.anchorX + 5, top: position.anchorY - 5, bottom: position.anchorY + 5 });
       const line = document.createElementNS(svgNamespace, 'line');
       line.setAttribute('x1', position.anchorX);
       line.setAttribute('y1', position.anchorY);
@@ -604,13 +826,16 @@ function renderMap(context) {
       const dot = document.createElementNS(svgNamespace, 'circle');
       dot.setAttribute('cx', position.anchorX);
       dot.setAttribute('cy', position.anchorY);
-      dot.setAttribute('r', '2.5');
+      // 실제 위치 점의 반지름임. map.css가 흰 테두리를 둘러 회색 육지 위에서도 보이게 함.
+      dot.setAttribute('r', '3');
       if (position.code === selectedCode) {
         line.classList.add('selected');
         dot.classList.add('selected');
       }
       connections.append(line, dot);
     }
+    // 모든 핀과 연결선 자리가 정해진 뒤에 펼친 핀의 이름표 자리를 정함.
+    placeLabels(spreadPositions, positions, pinByCode, width, obstacles, lines);
   }
   // 핀을 배치하고, 화면 폭이 바뀔 때 다시 배치하며, 조준선도 켬.
   // boot는 다음 그리기 전에 반환한 정리 함수를 부르므로, 관찰 해제와 조준선 정리를 한 함수로 묶음.
@@ -637,7 +862,8 @@ function renderMap(context) {
   // 지도 영역의 소제목 h2임.
   const mapTitle = el('h2', {}, '세계 지도');
 
-  const mapHelp = el('p', { className: 'map-help' }, '가까운 핀은 펼쳐서 표시합니다. 연결선 끝의 점이 실제 국가 위치입니다. 지도가 잘리면 좌우로 스크롤하세요.');
+  // 지도 아래 안내 문장임. 펼친 핀에는 국가 이름이 함께 보인다는 점과 연결선 끝의 점이 실제 위치라는 점을 알려 줌.
+  const mapHelp = el('p', { className: 'map-help' }, '가까운 핀은 펼쳐서 국가 이름과 함께 표시합니다. 연결선 끝의 점이 실제 국가 위치입니다. 지도가 잘리면 좌우로 스크롤하세요.');
   mapPanel.append(mapTitle, toolbar, viewport, mapHelp);
 
   // 감상한 영화 모드에서 핀이 하나도 없으면(주로 감상 기록이 아직 없을 때) 다음 행동을 안내함.

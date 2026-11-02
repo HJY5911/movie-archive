@@ -120,14 +120,17 @@
   pointer-events: none;
 }
 
-/* 연결선과 실제 위치 점은 회색으로 흐리게 그림. */
+/* 연결선과 실제 위치 점은 진한 회색(--color-gray-700)으로 그림. 연한 회색 1px 선은 회색 육지 위에서 잘 보이지 않았기 때문임. */
 .map-connections line {
-  stroke: var(--color-gray-500);
-  stroke-width: 1;
+  stroke: var(--color-gray-700);
+  stroke-width: 1.5;
 }
 
+/* 실제 위치 점에는 흰 테두리를 둘러, 육지 경계선이나 연결선과 겹쳐도 점이 따로 보이게 함. */
 .map-connections circle {
-  fill: var(--color-gray-500);
+  fill: var(--color-gray-700);
+  stroke: #ffffff;
+  stroke-width: 1.5;
 }
 
 /* 선택된 국가의 연결선과 점은 검정·굵게 그림. */
@@ -255,11 +258,43 @@
   pointer-events: none;
 }
 
-/* 마우스를 올렸을 때, Tab 키로 초점이 왔을 때, 선택된 핀일 때만 이름표를 보여줌. */
+/*
+ * 펼친 핀(map.js가 map-pin-spread를 붙인, 실제 위치에서 옮겨진 핀)은 이름표를 항상 보여줌.
+ * 다른 대륙 위로 밀려난 핀(예: 아프리카 위의 이탈리아 핀)을 그 대륙의 나라로 오해하지 않게 하기 위함임.
+ * 평소에는 흰 바탕·검은 글자·회색 테두리로 가볍게 보여주고, 마우스를 올리거나 선택하면 아래 규칙에 따라 검은 이름표가 됨.
+ * 이름표 자리(아래·옆·위·대각선)는 map.js가 다른 핀과 이름표를 피해 정하고 style로 넣음.
+ */
+.map-canvas .map-pin.map-pin-spread .map-pin-label {
+  border: 1px solid var(--color-gray-500);
+  background: #ffffff;
+  color: var(--color-ink);
+  visibility: visible;
+}
+
+/* 펼친 핀의 평소 이름표에는 국가 이름만 보이도록 ' · 3편' 부분(span.map-pin-count)을 숨김. 글자가 짧을수록 이름표끼리 덜 부딪힘. */
+.map-canvas .map-pin.map-pin-spread .map-pin-count {
+  display: none;
+}
+
+/*
+ * 마우스를 올렸을 때, Tab 키로 초점이 왔을 때, 선택된 핀일 때 검은 이름표를 보여줌.
+ * 바탕·글자·테두리 색을 여기서 다시 정하므로, 위의 흰 이름표였던 펼친 핀도 이 상태에서는 검은 이름표가 됨.
+ * 펼치지 않은 핀의 이름표에는 테두리가 없으므로(border 없음) border-color는 모양에 영향이 없음.
+ */
 .map-canvas .map-pin:hover .map-pin-label,
 .map-canvas .map-pin:focus-visible .map-pin-label,
 .map-canvas .map-pin[aria-pressed="true"] .map-pin-label {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: #ffffff;
   visibility: visible;
+}
+
+/* 검은 이름표 상태에서는 영화 수(' · 3편')도 함께 보여줌. inline은 글자 줄 안에 이어 붙는 기본 표시 방식임. */
+.map-canvas .map-pin:hover .map-pin-count,
+.map-canvas .map-pin:focus-visible .map-pin-count,
+.map-canvas .map-pin[aria-pressed="true"] .map-pin-count {
+  display: inline;
 }
 
 /* 이름표가 보이는 핀은 다른 핀(z-index 1)보다 위에 그려서 가려지지 않게 함. */
@@ -278,6 +313,22 @@
  */
 .map-canvas:has(.map-pin:hover, .map-pin:focus-visible) .map-pin[aria-pressed="true"]:not(:hover, :focus-visible) .map-pin-label {
   visibility: hidden;
+}
+
+/*
+ * 선택된 핀이 펼친 핀이면 이때 숨기지 않고 평소의 흰 이름표(국가 이름만)로 되돌림.
+ * 펼친 핀의 이름표는 항상 보여야 하고, 흰 이름표는 작아서 다른 핀의 검은 이름표와 덜 겹치기 때문임.
+ * 선택자에 .map-pin-spread가 더 붙어 위 규칙보다 우선함.
+ */
+.map-canvas:has(.map-pin:hover, .map-pin:focus-visible) .map-pin.map-pin-spread[aria-pressed="true"]:not(:hover, :focus-visible) .map-pin-label {
+  border-color: var(--color-gray-500);
+  background: #ffffff;
+  color: var(--color-ink);
+  visibility: visible;
+}
+
+.map-canvas:has(.map-pin:hover, .map-pin:focus-visible) .map-pin.map-pin-spread[aria-pressed="true"]:not(:hover, :focus-visible) .map-pin-count {
+  display: none;
 }
 
 /* 키보드 초점 표시는 투명한 버튼 상자 대신 눈에 보이는 물방울(.map-pin-head::before) 둘레에 그림. */
@@ -419,6 +470,19 @@
   left: 0;
   height: 3px;
   background: var(--color-orange);
+}
+
+/*
+ * 데스크톱(992px 이상)에서는 오른쪽 영화 목록·국가 순위를 따라 아래로 내려가도 지도가 화면 위쪽에 붙어 있게 함.
+ * 영화가 많으면 오른쪽 칸이 지도보다 훨씬 길어져, 지도가 화면 밖으로 나가고 왼쪽 아래가 비어 보이기 때문임.
+ * position: sticky는 부모(map-layout) 안에서 스크롤하는 동안 top 위치에 머무르다가 부모가 끝나면 함께 올라감.
+ * 화면 높이가 640px보다 낮으면 지도 칸(약 520px)이 다 보이지 않을 수 있어 붙이지 않음.
+ */
+@media (min-width: 992px) and (min-height: 640px) {
+  .map-panel {
+    position: sticky;
+    top: 24px;
+  }
 }
 
 /* 태블릿 이하(991.98px 이하)에서는 지도 아래로 국가 정보를 쌓음. */

@@ -20,7 +20,7 @@ import { boot, movieCard, showMessage } from '../ui.js';
 import { searchMovies } from '../selectors.js';
 
 // location.search는 현재 URL에서 ?부터 시작하는 검색 매개변수 부분임.
-// 예: movies.html?q=시달소에서 q의 값을 쉽게 읽도록 URLSearchParams 객체로 감쌈.
+// 예: movies.html?q=검색어에서 q의 값을 쉽게 읽도록 URLSearchParams 객체로 감쌈.
 const urlParams = new URLSearchParams(location.search);
 // get('q')는 q 항목의 값을 문자열로 반환함. q가 없으면 null을 반환함.
 // 검색할 때마다 값이 바뀌므로 재대입이 가능한 let을 사용함.
@@ -89,8 +89,9 @@ function renderMovies(context) {
   input.className = 'form-control';
   // 현재 검색어를 입력칸에 넣음. URL로 들어온 검색어도 여기서 화면에 나타남.
   input.value = query;
-  // placeholder는 입력이 비어 있을 때만 보이는 예시임. '시달소'는 현재 자료에 있는 '시간을 달리는 소녀'의 별칭임.
-  input.placeholder = '예: 시달소';
+  // placeholder는 입력이 비어 있을 때만 흐리게 보이는 안내 문구임.
+  // 특정 영화 이름을 예로 들면 영화 자료(data/catalog.json)를 바꿀 때 함께 고쳐야 하므로, 무엇으로 찾을 수 있는지만 적음.
+  input.placeholder = '제목, 별칭, 배우 또는 감독 이름';
   // 보조 기술에도 검색 가능한 정보의 종류를 알려줌. 실제 검색 범위를 바꾸는 속성은 아님.
   input.setAttribute('aria-label', '영화 제목, 별칭, 배우 또는 감독');
   // button 요소를 만들어 검색을 실행할 제출 버튼으로 사용함.

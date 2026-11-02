@@ -487,8 +487,9 @@ function buildUploadPanel(context) {
     className: 'form-control',
     // 화면을 다시 그려도 적어 둔 검색어가 그대로 보이도록 기억한 값을 넣음.
     value: searchText,
-    // 입력칸이 비어 있을 때 흐리게 보이는 예시임. movies.js의 검색창과 같은 예시를 사용함.
-    placeholder: '예: 시달소',
+    // 입력칸이 비어 있을 때 흐리게 보이는 안내 문구임. movies.js의 검색창과 같은 문구를 사용함.
+    // 특정 영화 이름을 넣지 않아 영화 자료를 바꿔도 고칠 필요가 없음.
+    placeholder: '제목, 별칭, 배우 또는 감독 이름',
     // 브라우저가 이전 입력값을 자동 완성 목록으로 띄우지 않게 함. 아래 결과 목록과 겹치지 않음.
     autocomplete: 'off',
     disabled: busy

@@ -23,7 +23,7 @@ function directorNames(catalog, movieId) {
     }
     const person = catalog.lookup.personById.get(credit.person_id);
     if (person !== undefined) {
-      names.push(person.name);
+      names.push(person.name.replaceAll(' ', '\u00a0'));
     }
   }
   return names;
@@ -128,7 +128,7 @@ function renderStep(catalog, step, nextStep, watchCounts) {
   }
   const directors = directorNames(catalog, movie.movie_id);
   if (directors.length > 0) {
-    info.push('감독 ' + directors.join(', '));
+    info.push('감독\u00a0' + directors.join(', '));
   }
 
   let statusText = '아직 감상 전';

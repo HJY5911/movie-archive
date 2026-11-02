@@ -66,7 +66,15 @@ export function movieCard(catalog, movie, { watched = false } = {}) {
 
   const details = document.createElement('p');
   details.className = 'movie-card-meta';
-  details.textContent = `${movie.release_date ? movie.release_date.slice(0, 4) : '개봉일 미등록'} · ${movie.runtime_min === null ? '상영 시간 미등록' : `${movie.runtime_min}분`}`;
+  let yearText = '개봉일 미등록';
+  if (movie.release_date) {
+    yearText = movie.release_date.slice(0, 4);
+  }
+  let runtimeText = '상영 시간 미등록';
+  if (movie.runtime_min !== null) {
+    runtimeText = `${movie.runtime_min}분`;
+  }
+  details.textContent = `${yearText} · ${runtimeText}`;
   body.appendChild(details);
 
   if (genres.length > 0) {
@@ -168,6 +176,15 @@ function mountSonarGrid() {
   });
 }
 
+function mountDataCredit() {
+  const footer = document.querySelector('footer');
+  if (footer === null) {
+    return;
+  }
+  const link = el('a', { className: 'text-reset text-decoration-underline', href: 'https://www.themoviedb.org', target: '_blank', rel: 'noopener' }, 'TMDB(themoviedb.org)');
+  footer.append(el('p', { className: 'small mt-2' }, '포스터·영화 정보 일부 출처: ', link, ' · 이 사이트는 TMDB의 승인·인증을 받지 않았습니다.'));
+}
+
 function mountShell(page) {
   const nav = el('nav', { className: 'navbar navbar-expand site-navbar', ariaLabel: '주 메뉴', dataset: { bsTheme: 'dark' } });
   const shell = el('div', { className: 'container-xl' });
@@ -176,8 +193,15 @@ function mountShell(page) {
   const list = el('ul', { className: 'navbar-nav' });
   for (const [key, title] of navigation) {
     const active = key === page || page === 'movie' && key === 'movies';
-    const link = el('a', { className: active ? 'nav-link active' : 'nav-link', href: `${key}.html` }, title, active ? el('span', { className: 'visually-hidden' }, ' (현재)') : null);
-    if (active) link.setAttribute('aria-current', 'page');
+    let linkClass = 'nav-link';
+    if (active) {
+      linkClass = 'nav-link active';
+    }
+    const link = el('a', { className: linkClass, href: `${key}.html` }, title);
+    if (active) {
+      link.append(el('span', { className: 'visually-hidden' }, ' (현재)'));
+      link.setAttribute('aria-current', 'page');
+    }
     list.append(el('li', { className: 'nav-item' }, link));
   }
   shell.append(brand, list);
@@ -190,6 +214,7 @@ function mountShell(page) {
   topbar.replaceChildren(el('p', {}, '저장 위치: 현재 브라우저'));
   const messages = document.querySelector('#messages');
   if (messages) topbar.append(messages);
+  mountDataCredit();
 }
 
 export async function boot({ page, title, render }) {

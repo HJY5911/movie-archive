@@ -69,6 +69,146 @@ function startCrosshair(stage) {
   return stopCrosshair;
 }
 
+const labelSides = ['below', 'right', 'left', 'above', 'below-right', 'below-left', 'above-right', 'above-left'];
+const labelGap = 4;
+
+function pinBox(position) {
+  return {
+    left: position.x - position.size / 2 - 2,
+    right: position.x + position.size / 2 + 2,
+    top: position.y - position.size / 2 - 2,
+    bottom: position.y + position.size * 0.707 + 2
+  };
+}
+
+function labelBox(side, position, width, height) {
+  const half = position.size / 2;
+  const corner = position.size * 0.36 + labelGap;
+  let left = position.x - width / 2;
+  let top = position.y + position.size * 0.707 + labelGap;
+  if (side === 'above') {
+    top = position.y - half - labelGap - height;
+  }
+  if (side === 'right') {
+    left = position.x + half + labelGap;
+    top = position.y - height / 2;
+  }
+  if (side === 'left') {
+    left = position.x - half - labelGap - width;
+    top = position.y - height / 2;
+  }
+  if (side === 'below-right' || side === 'above-right') {
+    left = position.x + corner;
+  }
+  if (side === 'below-left' || side === 'above-left') {
+    left = position.x - corner - width;
+  }
+  if (side === 'below-right' || side === 'below-left') {
+    top = position.y + corner;
+  }
+  if (side === 'above-right' || side === 'above-left') {
+    top = position.y - corner - height;
+  }
+  return { left: left, right: left + width, top: top, bottom: top + height };
+}
+
+function boxesOverlap(a, b) {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
+function lineCrossesBox(line, box) {
+  for (let step = 0; step <= 20; step += 1) {
+    const x = line.x1 + (line.x2 - line.x1) * step / 20;
+    const y = line.y1 + (line.y2 - line.y1) * step / 20;
+    if (x > box.left && x < box.right && y > box.top && y < box.bottom) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function distanceToBox(x, y, box) {
+  const dx = Math.max(box.left - x, 0, x - box.right);
+  const dy = Math.max(box.top - y, 0, y - box.bottom);
+  return Math.hypot(dx, dy);
+}
+
+function labelCost(box, own, positions, width, obstacles, lines) {
+  const ownDistance = distanceToBox(own.x, own.y, box);
+  let cost = 0;
+  if (box.left < 0 || box.top < 0 || box.right > width || box.bottom > width / 2) {
+    cost += 10000;
+  }
+  for (const other of obstacles) {
+    if (boxesOverlap(box, other)) {
+      cost += 1000;
+    }
+  }
+  for (const other of positions) {
+    if (other !== own && distanceToBox(other.x, other.y, box) < ownDistance) {
+      cost += 100;
+    }
+  }
+  for (const line of lines) {
+    if (lineCrossesBox(line, box)) {
+      cost += 10;
+    }
+  }
+  return cost;
+}
+
+function moveLabel(label, side, box, position) {
+  const buttonLeft = position.x - position.size / 2;
+  const buttonTop = position.y - position.size / 2;
+  label.style.top = (box.top - buttonTop) + 'px';
+  if (side === 'below' || side === 'above') {
+    return;
+  }
+  label.style.transform = 'none';
+  if (side === 'left' || side === 'below-left' || side === 'above-left') {
+    label.style.left = 'auto';
+    label.style.right = (buttonLeft + position.size - box.right) + 'px';
+    return;
+  }
+  label.style.left = (box.left - buttonLeft) + 'px';
+}
+
+function compareFreeSides(a, b) {
+  return a.freeSides - b.freeSides;
+}
+
+function placeLabels(spreadPositions, positions, pinByCode, width, obstacles, lines) {
+  const jobs = [];
+  for (const position of spreadPositions) {
+    const label = pinByCode[position.code].button.querySelector('.map-pin-label');
+    const job = { position: position, label: label, width: label.offsetWidth, height: label.offsetHeight, freeSides: 0 };
+    for (const side of labelSides) {
+      if (labelCost(labelBox(side, position, job.width, job.height), position, positions, width, obstacles, lines) < 100) {
+        job.freeSides += 1;
+      }
+    }
+    jobs.push(job);
+  }
+  jobs.sort(compareFreeSides);
+
+  for (const job of jobs) {
+    let bestSide = labelSides[0];
+    let bestBox = null;
+    let bestCost = Infinity;
+    for (const side of labelSides) {
+      const box = labelBox(side, job.position, job.width, job.height);
+      const cost = labelCost(box, job.position, positions, width, obstacles, lines);
+      if (cost < bestCost) {
+        bestSide = side;
+        bestBox = box;
+        bestCost = cost;
+      }
+    }
+    moveLabel(job.label, bestSide, bestBox, job.position);
+    obstacles.push(bestBox);
+  }
+}
+
 function moviesByCountry(catalog, logs) {
   if (mode === 'watched') {
     const projections = buildProjections(catalog, logs);
@@ -237,7 +377,8 @@ function renderMap(context) {
     pin.style.top = position.top + '%';
 
     const pinHead = el('span', { className: 'map-pin-head' });
-    const pinLabel = el('span', { className: 'map-pin-label' }, `${country.name} · ${count}편`);
+    const pinCount = el('span', { className: 'map-pin-count' }, ` · ${count}편`);
+    const pinLabel = el('span', { className: 'map-pin-label' }, country.name, pinCount);
     pin.append(pinHead, pinLabel);
     const pinInfo = { code: country.country_code, left: position.left, top: position.top, size: 0, button: pin };
     pins.push(pinInfo);
@@ -270,14 +411,28 @@ function renderMap(context) {
     canvas.style.width = width + 'px';
     connections.setAttribute('viewBox', '0 0 ' + width + ' ' + width / 2);
     connections.replaceChildren();
+    const obstacles = [];
+    const lines = [];
+    const spreadPositions = [];
     for (const position of positions) {
       const pin = pinByCode[position.code];
       const tipY = position.y + position.size * 0.707;
       pin.button.style.left = position.x + 'px';
       pin.button.style.top = tipY + 'px';
+      const label = pin.button.querySelector('.map-pin-label');
+      pin.button.classList.remove('map-pin-spread');
+      label.removeAttribute('style');
+      obstacles.push(pinBox(position));
       if (Math.hypot(position.x - position.anchorX, tipY - position.anchorY) < 1) {
+        if (position.code === selectedCode) {
+          obstacles.push(labelBox('below', position, label.offsetWidth, label.offsetHeight));
+        }
         continue;
       }
+      pin.button.classList.add('map-pin-spread');
+      spreadPositions.push(position);
+      lines.push({ x1: position.anchorX, y1: position.anchorY, x2: position.x, y2: tipY });
+      obstacles.push({ left: position.anchorX - 5, right: position.anchorX + 5, top: position.anchorY - 5, bottom: position.anchorY + 5 });
       const line = document.createElementNS(svgNamespace, 'line');
       line.setAttribute('x1', position.anchorX);
       line.setAttribute('y1', position.anchorY);
@@ -286,13 +441,14 @@ function renderMap(context) {
       const dot = document.createElementNS(svgNamespace, 'circle');
       dot.setAttribute('cx', position.anchorX);
       dot.setAttribute('cy', position.anchorY);
-      dot.setAttribute('r', '2.5');
+      dot.setAttribute('r', '3');
       if (position.code === selectedCode) {
         line.classList.add('selected');
         dot.classList.add('selected');
       }
       connections.append(line, dot);
     }
+    placeLabels(spreadPositions, positions, pinByCode, width, obstacles, lines);
   }
 
   function startMapEffects() {
@@ -314,7 +470,7 @@ function renderMap(context) {
   viewport.append(canvas);
   const mapPanel = el('section', { className: 'map-panel' });
   const mapTitle = el('h2', {}, '세계 지도');
-  const mapHelp = el('p', { className: 'map-help' }, '가까운 핀은 펼쳐서 표시합니다. 연결선 끝의 점이 실제 국가 위치입니다. 지도가 잘리면 좌우로 스크롤하세요.');
+  const mapHelp = el('p', { className: 'map-help' }, '가까운 핀은 펼쳐서 국가 이름과 함께 표시합니다. 연결선 끝의 점이 실제 국가 위치입니다. 지도가 잘리면 좌우로 스크롤하세요.');
   mapPanel.append(mapTitle, toolbar, viewport, mapHelp);
 
   if (ranking.length === 0 && mode === 'watched') {

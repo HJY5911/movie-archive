@@ -4,6 +4,8 @@
 
 현재 두 출처의 코드를 옮겨 씀: React Bits(로고 입자·첫 화면·지도 조준선)와 21st.dev의 Sonar Grid(모든 페이지의 배경 점 격자).
 
+옮겨 쓴 코드와 별도로, 화면 틀(Bootstrap 5.3.3 CSS)과 글꼴(Pretendard, Anton), 포스터 이미지(TMDB)는 저장소에 넣지 않고 주소로 불러옴. 목록은 맨 아래 '링크로 불러오는 외부 자원'에 있음.
+
 ## React Bits
 
 - 출처: https://github.com/DavidHDev/react-bits (https://reactbits.dev)
@@ -87,3 +89,16 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## 링크로 불러오는 외부 자원 (저장소에 포함하지 않음)
+
+아래 자원은 파일을 저장소에 복사하지 않고, 페이지를 열 때 브라우저가 주소에서 바로 불러옴. 그래서 화면이 제대로 보이려면 인터넷 연결이 필요함.
+
+| 자원 | 불러오는 곳 | 주소 | 저작권 | 라이선스 |
+| --- | --- | --- | --- | --- |
+| Bootstrap 5.3.3 CSS (JS는 쓰지 않음) | css/common.css 맨 위 @import | https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css | Copyright (c) 2011-2024 The Bootstrap Authors | MIT (https://github.com/twbs/bootstrap/blob/v5.3.3/LICENSE) |
+| Pretendard 1.3.9 (본문 한글 글꼴) | css/common.css 맨 위 @import | https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css | Copyright (c) 2021, Kil Hyung-jin, with Reserved Font Name Pretendard | SIL Open Font License 1.1 (https://github.com/orioncactus/pretendard/blob/v1.3.9/LICENSE) |
+| Anton (로고 FILMLOG 영문 글꼴) | css/common.css 맨 위 @import (Google Fonts) | https://fonts.googleapis.com/css2?family=Anton&display=swap | Copyright 2020 The Anton Project Authors (디자이너 Vernon Adams) | SIL Open Font License 1.1 (https://github.com/google/fonts/blob/main/ofl/anton/OFL.txt) |
+| 영화 포스터 이미지 | data/catalog.json의 poster_url | https://image.tmdb.org/t/p/w500/... | 각 포스터의 권리자 | TMDB(themoviedb.org)에서 제공하는 이미지 주소를 연결함. 모든 페이지 바닥글에 TMDB 출처와 'TMDB의 승인·인증을 받지 않음' 문구를 표시함 |
+
+Bootstrap과 두 글꼴은 수정하지 않고 그대로 불러오며, 이 사이트에 맞춘 색·여백·버튼 모양은 css/common.css의 규칙으로 덮어씀.

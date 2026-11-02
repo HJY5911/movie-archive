@@ -52,7 +52,8 @@ function directorNames(catalog, movieId) {
     // personById는 repository.js가 만들어 둔 '인물ID → 인물 정보' Map임.
     const person = catalog.lookup.personById.get(credit.person_id);
     if (person !== undefined) {
-      names.push(person.name);
+      // 이름 안의 띄어쓰기를 줄바꿈 없는 공백(\u00a0)으로 바꿈. 좁은 화면에서 '피트 / 닥터'처럼 이름 중간에서 줄이 바뀌지 않게 하기 위함임.
+      names.push(person.name.replaceAll(' ', '\u00a0'));
     }
   }
   return names;
@@ -179,7 +180,8 @@ function renderStep(catalog, step, nextStep, watchCounts) {
   }
   const directors = directorNames(catalog, movie.movie_id);
   if (directors.length > 0) {
-    info.push('감독 ' + directors.join(', '));
+    // '감독'과 첫 이름 사이도 줄바꿈 없는 공백으로 이어 '감독'만 줄 끝에 홀로 남지 않게 함. 이름과 이름 사이(', ')에서는 줄을 바꿀 수 있음.
+    info.push('감독\u00a0' + directors.join(', '));
   }
 
   let statusText = '아직 감상 전';

@@ -11,7 +11,7 @@
  * 1. el(): HTML 요소를 만드는 공통 도구
  * 2. showMessage(): 저장 성공·실패 등의 안내
  * 3. movieCard(): 영화 정보와 상세 페이지 링크
- * 4. mountShell(): 모든 페이지에 공통 메뉴와 배경 점 격자 설치
+ * 4. mountShell(): 모든 페이지에 공통 메뉴와 배경 점 격자 설치, 바닥글에 자료 출처(TMDB) 추가
  * 5. boot(): 데이터 준비 → 기록 읽기 → 각 페이지의 render() 호출
  *
  * export가 붙은 함수는 다른 파일에서 import하여 사용할 수 있음.
@@ -217,11 +217,18 @@ export function movieCard(catalog, movie, { watched = false } = {}) {
   // 개봉 연도와 상영 시간을 ' · '로 이은 한 줄임. 예: '2019 · 132분'
   const details = document.createElement('p');
   details.className = 'movie-card-meta';
-  // 조건 ? 참일 때 값 : 거짓일 때 값 은 삼항 연산자임.
-  // release_date가 있으면 slice(0, 4)로 앞 네 글자(연도)만 꺼내고, 없으면 '개봉일 미등록'을 씀.
-  // 상영 시간은 null일 때 '상영 시간 미등록', 숫자가 있으면 '120분'처럼 표시함.
-  // 바깥 템플릿 문자열 안의 ${...}에서 또 다른 템플릿 문자열을 사용할 수 있음.
-  details.textContent = `${movie.release_date ? movie.release_date.slice(0, 4) : '개봉일 미등록'} · ${movie.runtime_min === null ? '상영 시간 미등록' : `${movie.runtime_min}분`}`;
+  // 먼저 기본값 '개봉일 미등록'을 넣어 두고, release_date가 있을 때만 slice(0, 4)로 앞 네 글자(연도)로 바꿈.
+  let yearText = '개봉일 미등록';
+  if (movie.release_date) {
+    yearText = movie.release_date.slice(0, 4);
+  }
+  // 상영 시간도 같은 방식임. null이면 기본값을 그대로 두고, 숫자가 있으면 '120분'처럼 바꿈.
+  let runtimeText = '상영 시간 미등록';
+  if (movie.runtime_min !== null) {
+    runtimeText = `${movie.runtime_min}분`;
+  }
+  // 두 값을 ' · '로 이어 한 줄로 표시함.
+  details.textContent = `${yearText} · ${runtimeText}`;
   body.appendChild(details);
 
   // 장르가 하나 이상일 때만 장르 줄을 만듦. join(' · ')은 배열 항목 사이에 ' · '를 넣어 이음.
@@ -393,6 +400,30 @@ function mountSonarGrid() {
 }
 
 /*
+ * mountDataCredit(): 모든 페이지 바닥글(footer)에 포스터·영화 정보의 출처(TMDB) 한 줄을 덧붙임.
+ * 포스터 이미지를 TMDB 주소에서 그대로 불러오므로 출처를 밝히고, TMDB의 승인·인증을 받은 사이트가 아님을 함께 적음.
+ * 바닥글은 HTML 7개에 똑같이 들어 있으므로, 같은 문장을 HTML마다 적지 않고 여기 한 곳에서만 붙임.
+ * 영화 자료(data/catalog.json)를 DB로 바꾸면 이 문장만 고치거나 이 함수 호출을 지우면 됨.
+ * 글자색·크기는 Bootstrap 클래스로만 정해 common.css를 고치지 않아도 됨.
+ *   small: 글자를 바닥글 기본 크기보다 조금 작게(0.875배) 만듦.
+ *   mt-2: 위쪽 팀 정보 줄과 조금 띄움.
+ *   text-reset: 링크 글자색을 바닥글의 회색으로 맞춤. 사이트 기본 링크색은 검정이라 검은 바닥글에서 보이지 않기 때문임.
+ *   text-decoration-underline: 같은 색이어도 링크임을 알 수 있게 밑줄을 그음.
+ */
+function mountDataCredit() {
+  // 페이지에 있는 첫 번째 footer 요소를 찾음. 없으면 null임.
+  const footer = document.querySelector('footer');
+  // 바닥글이 없는 페이지에서는 아무것도 하지 않고 끝냄.
+  if (footer === null) {
+    return;
+  }
+  // target="_blank"는 새 탭에서 열고, rel="noopener"는 새 탭이 이 페이지(window.opener)를 건드리지 못하게 막음.
+  const link = el('a', { className: 'text-reset text-decoration-underline', href: 'https://www.themoviedb.org', target: '_blank', rel: 'noopener' }, 'TMDB(themoviedb.org)');
+  // append는 기존 팀 정보 줄 뒤(바닥글 맨 끝)에 새 문단을 붙임.
+  footer.append(el('p', { className: 'small mt-2' }, '포스터·영화 정보 일부 출처: ', link, ' · 이 사이트는 TMDB의 승인·인증을 받지 않았습니다.'));
+}
+
+/*
  * mountShell(page): 공통 메뉴와 저장 위치 안내를 HTML의 빈 자리들에 넣음.
  * page는 'index', 'calendar'처럼 현재 페이지를 구분하는 값임.
  * export가 없으므로 다른 모듈에서 직접 가져올 수 없고, 아래 boot()가 내부에서 호출함.
@@ -423,12 +454,19 @@ function mountShell(page) {
     // (현재 메뉴 key와 page가 같음) 또는 (상세 페이지 movie이면서 영화 검색 메뉴임).
     // 상세 페이지에는 별도 메뉴가 없으므로 영화 검색 메뉴를 현재 위치로 표시함.
     const active = key === page || page === 'movie' && key === 'movies';
-    // 현재 메뉴에는 Bootstrap의 active 클래스를 더 붙여 굵은 글자 + 주황 밑줄 막대로 보여줌.
-    // ' (현재)' 글자는 visually-hidden span에 넣음. 화면에는 보이지 않고 화면 읽기 프로그램만 읽음.
-    // 현재 메뉴가 아니면 세 번째 자식 자리에 null을 넘기며, el()은 null 자식을 건너뜀.
-    const link = el('a', { className: active ? 'nav-link active' : 'nav-link', href: `${key}.html` }, title, active ? el('span', { className: 'visually-hidden' }, ' (현재)') : null);
-    // 현재 위치임을 보조 기술에도 전달함.
-    if (active) link.setAttribute('aria-current', 'page');
+    // 기본 클래스는 nav-link이고, 현재 메뉴에만 Bootstrap의 active 클래스를 더 붙여 굵은 글자 + 주황 밑줄 막대로 보여줌.
+    let linkClass = 'nav-link';
+    if (active) {
+      linkClass = 'nav-link active';
+    }
+    const link = el('a', { className: linkClass, href: `${key}.html` }, title);
+    // 현재 메뉴일 때만 두 가지를 더함.
+    // ' (현재)' 글자는 visually-hidden span에 넣어 메뉴 이름 뒤에 붙임. 화면에는 보이지 않고 화면 읽기 프로그램만 읽음.
+    // aria-current="page"로 현재 위치임을 보조 기술에도 전달함.
+    if (active) {
+      link.append(el('span', { className: 'visually-hidden' }, ' (현재)'));
+      link.setAttribute('aria-current', 'page');
+    }
     // li 안에 링크를 넣고, 완성한 li를 부모 list(ul)에 추가함.
     list.append(el('li', { className: 'nav-item' }, link));
   }
@@ -453,6 +491,8 @@ function mountShell(page) {
   // querySelector는 요소가 없으면 null을 반환하므로, 존재할 때만 append함.
   // 이미 문서 안에 있는 요소를 append하면 복제하지 않고 원래 자리에서 새 자리로 옮김.
   if (messages) topbar.append(messages);
+  // 마지막으로 바닥글에 자료 출처 줄을 붙임. 바닥글은 본문 아래라 메뉴·본문 준비에 영향이 없음.
+  mountDataCredit();
 }
 
 /*

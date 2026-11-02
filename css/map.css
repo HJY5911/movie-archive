@@ -94,12 +94,14 @@
 }
 
 .map-connections line {
-  stroke: var(--color-gray-500);
-  stroke-width: 1;
+  stroke: var(--color-gray-700);
+  stroke-width: 1.5;
 }
 
 .map-connections circle {
-  fill: var(--color-gray-500);
+  fill: var(--color-gray-700);
+  stroke: #ffffff;
+  stroke-width: 1.5;
 }
 
 .map-connections line.selected {
@@ -178,10 +180,30 @@
   pointer-events: none;
 }
 
+.map-canvas .map-pin.map-pin-spread .map-pin-label {
+  border: 1px solid var(--color-gray-500);
+  background: #ffffff;
+  color: var(--color-ink);
+  visibility: visible;
+}
+
+.map-canvas .map-pin.map-pin-spread .map-pin-count {
+  display: none;
+}
+
 .map-canvas .map-pin:hover .map-pin-label,
 .map-canvas .map-pin:focus-visible .map-pin-label,
 .map-canvas .map-pin[aria-pressed="true"] .map-pin-label {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: #ffffff;
   visibility: visible;
+}
+
+.map-canvas .map-pin:hover .map-pin-count,
+.map-canvas .map-pin:focus-visible .map-pin-count,
+.map-canvas .map-pin[aria-pressed="true"] .map-pin-count {
+  display: inline;
 }
 
 .map-canvas .map-pin:hover,
@@ -192,6 +214,17 @@
 
 .map-canvas:has(.map-pin:hover, .map-pin:focus-visible) .map-pin[aria-pressed="true"]:not(:hover, :focus-visible) .map-pin-label {
   visibility: hidden;
+}
+
+.map-canvas:has(.map-pin:hover, .map-pin:focus-visible) .map-pin.map-pin-spread[aria-pressed="true"]:not(:hover, :focus-visible) .map-pin-label {
+  border-color: var(--color-gray-500);
+  background: #ffffff;
+  color: var(--color-ink);
+  visibility: visible;
+}
+
+.map-canvas:has(.map-pin:hover, .map-pin:focus-visible) .map-pin.map-pin-spread[aria-pressed="true"]:not(:hover, :focus-visible) .map-pin-count {
+  display: none;
 }
 
 .map-canvas .map-pin:focus-visible {
@@ -307,6 +340,13 @@
   left: 0;
   height: 3px;
   background: var(--color-orange);
+}
+
+@media (min-width: 992px) and (min-height: 640px) {
+  .map-panel {
+    position: sticky;
+    top: 24px;
+  }
 }
 
 @media (max-width: 991.98px) {

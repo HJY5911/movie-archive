@@ -102,7 +102,8 @@ boot({
     // form-control은 Bootstrap의 입력칸 모양 클래스임. 테두리·여백·초점 표시를 정함.
     className: 'form-control',
     // placeholder는 아무것도 입력하지 않았을 때 보이는 안내임. 실제 입력값은 아님.
-    placeholder: '영화 제목, 배우 또는 감독을 검색하세요',
+    // 영화 검색·사진 보관함 검색창과 같은 문구를 써서 별칭(예: 영문 제목)으로도 찾을 수 있음을 알림.
+    placeholder: '제목, 별칭, 배우 또는 감독 이름',
     // ariaLabel은 화면 읽기 프로그램 등이 이 입력칸의 목적을 알 수 있도록 붙이는 이름임.
     ariaLabel: '영화 검색어'
   });

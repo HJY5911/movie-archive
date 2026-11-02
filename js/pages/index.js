@@ -22,7 +22,7 @@ boot({
     type: 'search',
     name: 'q',
     className: 'form-control',
-    placeholder: '영화 제목, 배우 또는 감독을 검색하세요',
+    placeholder: '제목, 별칭, 배우 또는 감독 이름',
     ariaLabel: '영화 검색어'
   });
 

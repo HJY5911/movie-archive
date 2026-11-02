@@ -238,7 +238,7 @@ function buildUploadPanel(context) {
     type: 'search',
     className: 'form-control',
     value: searchText,
-    placeholder: '예: 시달소',
+    placeholder: '제목, 별칭, 배우 또는 감독 이름',
     autocomplete: 'off',
     disabled: busy
   });

@@ -35,7 +35,7 @@ function renderMovies(context) {
   input.name = 'q';
   input.className = 'form-control';
   input.value = query;
-  input.placeholder = '예: 시달소';
+  input.placeholder = '제목, 별칭, 배우 또는 감독 이름';
   input.setAttribute('aria-label', '영화 제목, 별칭, 배우 또는 감독');
   const submit = document.createElement('button');
   submit.type = 'submit';
