@@ -14,6 +14,8 @@
  * - 삭제는 빨간 글자 버튼(btn btn-link text-danger)임.
  * - aria-pressed가 있는 선택 버튼은 탭처럼 보임. 선택되면 굵은 글자 + 두꺼운 밑줄 막대로 표시함.
  *   색만으로 구분하지 않도록 굵기와 막대 모양을 함께 바꿈.
+ * - 예전 방식 클래스(button, button secondary, button danger)는 파일 맨 아래 호환 규칙이 위와 같은 모양으로 맞춤.
+ *   새로 짜는 코드는 호환 규칙에 기대지 말고 Bootstrap 클래스(btn btn-link, btn btn-primary)를 씀.
  *
  * Bootstrap 5.3.3의 CSS만 불러옴(Bootstrap JS는 쓰지 않음).
  * HTML에 link를 더 넣지 않도록 이 파일 맨 위에서 @import로 불러온 뒤, 아래 규칙으로 덮어씀.
@@ -1336,5 +1338,197 @@ footer p {
 
   .search-form input::placeholder {
     font-size: 0.875rem;
+  }
+}
+
+/*
+ * ===== 예전 버튼 클래스 호환 =====
+ * 처음 공통 CSS(Bootstrap 적용 전)에서는 버튼에 class="button"을 붙였음.
+ * 지금 디자인에는 그 규칙이 없어서, 예전 방식으로 짠 버튼은 회색 기본 버튼이나 그냥 글자로 보임.
+ * 아직 만들지 않은 페이지(통계·업적 등)를 예전 방식으로 짜도 같은 모양이 나오도록 아래 규칙을 둠.
+ *
+ * 짝 맞춤:
+ * - .button, a.button, .button.secondary -> btn btn-link (진한 주황 글자 버튼)
+ * - .button[type="submit"] -> btn btn-primary (주황 사각형). 검색, 감상 기록 저장 같은 제출 버튼임.
+ *   단, secondary나 danger가 함께 붙어 있으면 제출 버튼이어도 글자 버튼으로 둠.
+ * - .button.danger -> btn btn-link text-danger (빨간 글자 버튼)
+ * - .button[aria-pressed] -> btn btn-link[aria-pressed] (탭 모양 선택 버튼)
+ * - .empty-state .button -> .empty-state .btn
+ *
+ * 새 규칙을 지어내지 않고, 위쪽 .btn·.btn-primary·.btn-link 규칙과 Bootstrap .btn이 쓰는
+ * 변수(--bs-btn-*)와 값을 그대로 옮겨 씀. 종류별로는 변수 값만 바꿈.
+ * class가 아예 없는 <button>에는 규칙을 걸지 않음.
+ * 시리즈 목록, 지도 순위, 사진 검색 결과 버튼이 class 없이 쓰이고 각 페이지 CSS가 모양을 정하기 때문임.
+ * 새 코드는 이 규칙을 쓰지 말고 Bootstrap 클래스를 직접 붙임.
+ */
+
+/*
+ * 기본 모양은 글자 버튼(btn btn-link)과 같음.
+ * 위쪽 변수 묶음은 평소·마우스 올림·누름·사용 못 함 상태의 글자색, 바탕색, 테두리색임.
+ * 아래 속성들은 Bootstrap .btn과 위쪽 .btn 규칙이 정하는 크기·글꼴·정렬과 같은 값임.
+ * --bs-border-width는 Bootstrap이 정한 테두리 두께(1px)임.
+ */
+.button {
+  --bs-btn-padding-x: 0.25rem;
+  --bs-btn-color: var(--color-orange-dark);
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: transparent;
+  --bs-btn-hover-color: var(--color-orange-dark);
+  --bs-btn-hover-bg: transparent;
+  --bs-btn-hover-border-color: transparent;
+  --bs-btn-active-color: var(--color-orange-dark);
+  --bs-btn-active-bg: transparent;
+  --bs-btn-active-border-color: transparent;
+  --bs-btn-disabled-color: var(--color-gray-500);
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.5rem var(--bs-btn-padding-x);
+  border: var(--bs-border-width) solid var(--bs-btn-border-color);
+  border-radius: 4px;
+  background-color: var(--bs-btn-bg);
+  color: var(--bs-btn-color);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+  text-decoration: none;
+  vertical-align: middle;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+/* 마우스를 올리면 hover 변수의 색으로 바뀜. */
+.button:hover {
+  border-color: var(--bs-btn-hover-border-color);
+  background-color: var(--bs-btn-hover-bg);
+  color: var(--bs-btn-hover-color);
+}
+
+/*
+ * 키보드 초점: 바탕과 테두리는 마우스를 올렸을 때와 같고, 글자색은 평소 색을 유지함.
+ * 3px 주황 초점 테두리는 파일 위쪽의 :focus-visible 규칙이 그대로 그림.
+ */
+.button:focus-visible {
+  border-color: var(--bs-btn-hover-border-color);
+  background-color: var(--bs-btn-hover-bg);
+}
+
+/* 글자 버튼처럼 마우스를 올리거나 키보드 초점이 오면 2px 밑줄이 생김. */
+.button:hover,
+.button:focus-visible {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.25em;
+}
+
+/* 누르는 동안의 색임. */
+.button:active {
+  border-color: var(--bs-btn-active-border-color);
+  background-color: var(--bs-btn-active-bg);
+  color: var(--bs-btn-active-color);
+}
+
+/* 사용 못 함(disabled): Bootstrap과 같이 흐리게(0.65) 보이고 눌리지 않음. */
+.button:disabled {
+  border-color: var(--bs-btn-disabled-border-color);
+  background-color: var(--bs-btn-disabled-bg);
+  color: var(--bs-btn-disabled-color);
+  pointer-events: none;
+  opacity: 0.65;
+}
+
+/*
+ * 제출 버튼은 주요 버튼(btn btn-primary)과 같은 주황 사각형이 됨. 제출 버튼으로 보는 경우는 세 가지임.
+ *   1. type="submit"이 붙은 버튼.
+ *   2. form 안에 있으면서 type을 적지 않은 버튼. type이 없으면 브라우저가 제출 버튼으로 동작시키기 때문임.
+ *   3. 예전 방식으로 주요 버튼을 뜻하는 class="button primary".
+ * :not(.secondary):not(.danger)는 secondary나 danger가 함께 붙은 버튼을 빼는 조건임.
+ * form 밖에서 type 없이 쓴 버튼(예: 오류 화면의 '다시 시도')은 제출 버튼이 아니므로 글자 버튼 모양 그대로임.
+ * 변수 값은 위쪽 .btn-primary와 같고, 좌우 여백 1.25rem과 최소 너비 88px도 같음.
+ */
+.button[type="submit"]:not(.secondary):not(.danger),
+.button.primary,
+form .button:not([type]):not(.secondary):not(.danger) {
+  --bs-btn-padding-x: 1.25rem;
+  --bs-btn-color: var(--color-ink);
+  --bs-btn-bg: var(--color-orange);
+  --bs-btn-border-color: var(--color-orange);
+  --bs-btn-hover-color: var(--color-ink);
+  --bs-btn-hover-bg: var(--color-orange-hover);
+  --bs-btn-hover-border-color: var(--color-orange-hover);
+  --bs-btn-active-color: var(--color-ink);
+  --bs-btn-active-bg: var(--color-orange-active);
+  --bs-btn-active-border-color: var(--color-orange-active);
+  --bs-btn-disabled-color: var(--color-ink);
+  --bs-btn-disabled-bg: var(--color-orange);
+  --bs-btn-disabled-border-color: var(--color-orange);
+  min-width: 88px;
+}
+
+/* 주황 사각형 버튼에는 밑줄을 긋지 않음. 마우스를 올리면 바탕색만 조금 진해짐. */
+.button[type="submit"]:not(.secondary):not(.danger):hover,
+.button[type="submit"]:not(.secondary):not(.danger):focus-visible,
+.button.primary:hover,
+.button.primary:focus-visible,
+form .button:not([type]):not(.secondary):not(.danger):hover,
+form .button:not([type]):not(.secondary):not(.danger):focus-visible {
+  text-decoration: none;
+  text-underline-offset: auto;
+}
+
+/* 위험한 동작(삭제): 모든 상태에서 빨간 글자로 둠. text-danger를 붙인 글자 버튼과 같음. */
+.button.danger {
+  --bs-btn-color: var(--color-danger);
+  --bs-btn-hover-color: var(--color-danger);
+  --bs-btn-active-color: var(--color-danger);
+  --bs-btn-disabled-color: var(--color-danger);
+}
+
+/*
+ * 예전 지도 표시 기준 버튼처럼 aria-pressed가 붙은 버튼은 탭 모양 선택 버튼이 됨.
+ * 값은 위쪽 .btn-link[aria-pressed] 규칙과 같음. 아래쪽 3px 테두리만 남겨 밑줄 막대로 씀.
+ */
+.button[aria-pressed] {
+  --bs-btn-padding-x: 0.125rem;
+  --bs-btn-color: var(--color-gray-700);
+  --bs-btn-hover-color: var(--color-ink);
+  --bs-btn-active-color: var(--color-ink);
+  --bs-btn-hover-border-color: var(--color-gray-300);
+  --bs-btn-active-border-color: var(--color-gray-300);
+  border-width: 0 0 3px;
+  border-radius: 0;
+  font-weight: 500;
+}
+
+/* 탭 모양은 밑줄 막대가 있으므로 마우스를 올려도 글자 밑줄을 긋지 않음. */
+.button[aria-pressed]:hover {
+  text-decoration: none;
+}
+
+/* 선택된 탭: 검은 굵은 글자 + 주황 밑줄 막대임. */
+.button[aria-pressed="true"] {
+  --bs-btn-color: var(--color-ink);
+  --bs-btn-border-color: var(--color-orange);
+  --bs-btn-hover-border-color: var(--color-orange);
+  --bs-btn-active-border-color: var(--color-orange);
+  font-weight: 700;
+}
+
+/* 빈 상태 상자 안 버튼은 .empty-state .btn과 같이 왼쪽 여백을 없애 문장과 줄을 맞춤. */
+.empty-state .button {
+  margin-right: 16px;
+  padding-left: 0;
+}
+
+/* 움직임 줄이기를 켠 사용자에게는 Bootstrap .btn과 같이 색 바뀜 효과를 끔. */
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
   }
 }

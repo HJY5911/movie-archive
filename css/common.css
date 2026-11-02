@@ -1114,3 +1114,141 @@ footer p {
     font-size: 0.875rem;
   }
 }
+
+.button {
+  --bs-btn-padding-x: 0.25rem;
+  --bs-btn-color: var(--color-orange-dark);
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: transparent;
+  --bs-btn-hover-color: var(--color-orange-dark);
+  --bs-btn-hover-bg: transparent;
+  --bs-btn-hover-border-color: transparent;
+  --bs-btn-active-color: var(--color-orange-dark);
+  --bs-btn-active-bg: transparent;
+  --bs-btn-active-border-color: transparent;
+  --bs-btn-disabled-color: var(--color-gray-500);
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.5rem var(--bs-btn-padding-x);
+  border: var(--bs-border-width) solid var(--bs-btn-border-color);
+  border-radius: 4px;
+  background-color: var(--bs-btn-bg);
+  color: var(--bs-btn-color);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+  text-decoration: none;
+  vertical-align: middle;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.button:hover {
+  border-color: var(--bs-btn-hover-border-color);
+  background-color: var(--bs-btn-hover-bg);
+  color: var(--bs-btn-hover-color);
+}
+
+.button:focus-visible {
+  border-color: var(--bs-btn-hover-border-color);
+  background-color: var(--bs-btn-hover-bg);
+}
+
+.button:hover,
+.button:focus-visible {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.25em;
+}
+
+.button:active {
+  border-color: var(--bs-btn-active-border-color);
+  background-color: var(--bs-btn-active-bg);
+  color: var(--bs-btn-active-color);
+}
+
+.button:disabled {
+  border-color: var(--bs-btn-disabled-border-color);
+  background-color: var(--bs-btn-disabled-bg);
+  color: var(--bs-btn-disabled-color);
+  pointer-events: none;
+  opacity: 0.65;
+}
+
+.button[type="submit"]:not(.secondary):not(.danger),
+.button.primary,
+form .button:not([type]):not(.secondary):not(.danger) {
+  --bs-btn-padding-x: 1.25rem;
+  --bs-btn-color: var(--color-ink);
+  --bs-btn-bg: var(--color-orange);
+  --bs-btn-border-color: var(--color-orange);
+  --bs-btn-hover-color: var(--color-ink);
+  --bs-btn-hover-bg: var(--color-orange-hover);
+  --bs-btn-hover-border-color: var(--color-orange-hover);
+  --bs-btn-active-color: var(--color-ink);
+  --bs-btn-active-bg: var(--color-orange-active);
+  --bs-btn-active-border-color: var(--color-orange-active);
+  --bs-btn-disabled-color: var(--color-ink);
+  --bs-btn-disabled-bg: var(--color-orange);
+  --bs-btn-disabled-border-color: var(--color-orange);
+  min-width: 88px;
+}
+
+.button[type="submit"]:not(.secondary):not(.danger):hover,
+.button[type="submit"]:not(.secondary):not(.danger):focus-visible,
+.button.primary:hover,
+.button.primary:focus-visible,
+form .button:not([type]):not(.secondary):not(.danger):hover,
+form .button:not([type]):not(.secondary):not(.danger):focus-visible {
+  text-decoration: none;
+  text-underline-offset: auto;
+}
+
+.button.danger {
+  --bs-btn-color: var(--color-danger);
+  --bs-btn-hover-color: var(--color-danger);
+  --bs-btn-active-color: var(--color-danger);
+  --bs-btn-disabled-color: var(--color-danger);
+}
+
+.button[aria-pressed] {
+  --bs-btn-padding-x: 0.125rem;
+  --bs-btn-color: var(--color-gray-700);
+  --bs-btn-hover-color: var(--color-ink);
+  --bs-btn-active-color: var(--color-ink);
+  --bs-btn-hover-border-color: var(--color-gray-300);
+  --bs-btn-active-border-color: var(--color-gray-300);
+  border-width: 0 0 3px;
+  border-radius: 0;
+  font-weight: 500;
+}
+
+.button[aria-pressed]:hover {
+  text-decoration: none;
+}
+
+.button[aria-pressed="true"] {
+  --bs-btn-color: var(--color-ink);
+  --bs-btn-border-color: var(--color-orange);
+  --bs-btn-hover-border-color: var(--color-orange);
+  --bs-btn-active-border-color: var(--color-orange);
+  font-weight: 700;
+}
+
+.empty-state .button {
+  margin-right: 16px;
+  padding-left: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
+  }
+}
