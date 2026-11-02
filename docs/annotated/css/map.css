@@ -91,6 +91,8 @@
 .map-canvas {
   position: relative;
   margin-top: 48px;
+  /* 지도 위에서는 십자 모양 커서를 기본으로 씀. 조준선이 켜지지 않는 환경(스크립트 꺼짐 등)에서도 위치를 고르는 곳임을 알 수 있음. */
+  cursor: crosshair;
 }
 
 /*
@@ -121,7 +123,8 @@
   padding: 0;
   border: 0;
   background: none;
-  /* z-index 1: 모든 핀을 같은 층에 둠. 이름표가 보이는 핀만 아래 규칙에서 2로 올려 다른 핀보다 위에 그림. */
+  /* z-index 1: 지도 조준선 canvas(z-index 없음)보다 핀을 위에 그림. canvas는 지도 그림보다는 위에 그려짐. */
+  /* 조준선의 선과 좌표 글자가 핀 아래로 지나가서 핀 머리가 가려지지 않음. */
   z-index: 1;
   cursor: pointer;
   /* 투명한 버튼 상자는 마우스를 받지 않게 함. 마우스는 아래 .map-pin-head::before(pointer-events: auto)만 받음. */
@@ -159,7 +162,8 @@
 
 /*
  * 핀 머리(.map-pin-head): 버튼과 같은 크기의 정사각형 span이며, 물방울의 둥근 머리 부분과 위치·크기가 같음.
- * 이 span 자체는 회전하지 않음.
+ * 이 span 자체는 회전하지 않음. 그래서 getBoundingClientRect()로 잰 크기가 둥근 머리와 같음.
+ * 지도 조준선(crosshair.js)은 이 크기에 사방 6px 여백을 더해 주황 잠금 상자를 그리므로, 상자가 핀 머리를 꼭 맞게 감쌈.
  * 눈에 보이는 물방울 모양과 가운데 점은 아래 ::before가 그림.
  * 기울인 핀도 span은 회전하지 않고 translate로 옮기기만 함. 옮기는 거리의 근거는 아래 물방울 모양 설명에 있음.
  */
@@ -284,6 +288,17 @@
  */
 .map-canvas .map-pin:focus-visible .map-pin-label {
   top: calc(120.7% + 14px);
+}
+
+/*
+ * 아래 규칙은 지도 조준선(js/effects/crosshair.js)을 위한 것임.
+ * 조준선 canvas와 클래스는 map.js가 마우스를 쓰는 화면에서만 만들므로, 터치 화면에서는 이 규칙이 적용되지 않음.
+ * 조준선 canvas는 지도 그림 위, 핀(z-index 1·2) 아래에 그려짐. 핀 머리와 이웃 핀이 선·좌표 글자에 가리지 않음.
+ */
+/* 조준선이 켜져 있으면 마우스를 올린 핀의 이름표는 숨김. 같은 내용(국가 이름·영화 수)을 조준선의 주황 표시가 보여주기 때문임. */
+/* 키보드 초점과 선택된 핀의 이름표는 그대로 보임. */
+.map-crosshair-on .map-pin:hover .map-pin-label {
+  visibility: hidden;
 }
 
 /* 선택한 국가의 '감상한 영화 2편' 안내임. */

@@ -1,13 +1,71 @@
 import { boot, el } from '../ui.js';
 import { buildProjections } from '../selectors.js';
+import { createCrosshair } from '../effects/crosshair.js';
 
 let mode = 'watched';
 let selectedCode = null;
+let crosshairResume = null;
 
 function toMapPosition(lat, lng) {
   const left = (lng + 180) / 360 * 100;
   const top = (90 - lat) / 180 * 100;
   return { left: left, top: top };
+}
+
+function toLatLng(leftRatio, topRatio) {
+  const lng = leftRatio * 360 - 180;
+  const lat = 90 - topRatio * 180;
+  return { lat: lat, lng: lng };
+}
+
+function formatDegree(value, positive, negative) {
+  let direction = positive;
+  if (value < 0) {
+    direction = negative;
+  }
+  return Math.abs(value).toFixed(1) + '°' + direction;
+}
+
+function mapReadout(leftRatio, topRatio, head) {
+  if (head !== null) {
+    const pin = head.closest('.map-pin');
+    const label = pin.querySelector('.map-pin-label');
+    if (label !== null) {
+      return label.textContent;
+    }
+    return pin.getAttribute('aria-label');
+  }
+  const point = toLatLng(leftRatio, topRatio);
+  return formatDegree(point.lat, 'N', 'S') + ' ' + formatDegree(point.lng, 'E', 'W');
+}
+
+function cssColor(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function startCrosshair(stage) {
+  if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    return undefined;
+  }
+  const crosshair = createCrosshair(stage, {
+    className: 'map-crosshair',
+    color: cssColor('--color-ink'),
+    lockColor: cssColor('--color-orange'),
+    thickness: 1,
+    opacity: 0.45,
+    gap: 10,
+    smoothing: 0.2,
+    targetSelector: '.map-pin-head',
+    readout: mapReadout,
+    clickPulse: true,
+    resume: crosshairResume
+  });
+  crosshairResume = null;
+
+  function stopCrosshair() {
+    crosshairResume = crosshair.destroy();
+  }
+  return stopCrosshair;
 }
 
 function moviesByCountry(catalog, logs) {
@@ -230,7 +288,7 @@ function renderMap(context) {
   if (selectedEntry === null) {
     layout.classList.add('single');
     app.replaceChildren(heading, layout);
-    return;
+    return startCrosshair(canvas);
   }
 
   const countryPanel = el('section', { className: 'map-country-panel' });
@@ -310,6 +368,7 @@ function renderMap(context) {
   layout.append(side);
 
   app.replaceChildren(heading, layout);
+  return startCrosshair(canvas);
 }
 
 boot({

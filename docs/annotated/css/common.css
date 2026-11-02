@@ -133,6 +133,41 @@ a:hover {
 }
 
 /*
+ * site-sonar: 모든 페이지 배경에 깔리는 점 격자 층(div)임. ui.js의 mountSonarGrid()가 body 맨 앞에 넣음.
+ * 이 층 안에 sonar-grid.js가 canvas를 꽉 채워 붙이고, 이 층의 크기를 재서 점을 그림.
+ * 그리는 방법은 js/effects/sonar-grid.js와 그 설명본(docs/annotated/js/effects/sonar-grid.js)에 있음.
+ * position: fixed로 화면(뷰포트)에 고정함. 내용을 스크롤해도 점 격자는 제자리에 있고 글자·카드만 그 위로 지나감.
+ * fixed는 position이 static이 아니므로, 안쪽 canvas의 position: absolute가 이 층을 기준으로 자리를 잡음.
+ * z-index: -1이면 흰 페이지 바탕보다는 위, 메뉴·본문·카드·입력칸·바닥글·알림보다는 아래에 그려짐.
+ * body의 흰 바탕은 문서 전체 바탕(캔버스)으로 옮겨 칠해지므로 -1 층이 그 바탕에 가려지지 않음.
+ * 배경색이 있는 요소(검은 메뉴 막대·바닥글, 흰 달력 칸, 회색 안내 상자, 메인 첫 화면의 검은 소개 화면)는 격자를 완전히 덮음.
+ * height를 100%가 아니라 100vh로 둠. 휴대폰에서 주소창이 접히고 펴질 때마다 층 크기가 바뀌어 점이 위아래로 튀는 것을 막음.
+ * pointer-events: none은 이 층이 클릭을 가로채지 않게 함. 누른 자리는 sonar-grid.js가 문서 전체에서 따로 받음.
+ * color는 점 색이 아니라 canvas에 넘기는 기본 색의 예비값임. ui.js가 --color-ink를 직접 넘기므로 평소에는 쓰이지 않음.
+ */
+.site-sonar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100vh;
+  pointer-events: none;
+  color: var(--color-ink);
+}
+
+/*
+ * 인쇄할 때는 장식 점이 종이에 찍히지 않게 숨김.
+ * 고대비(강제 색상) 모드에서는 브라우저가 바탕색을 바꾸므로 점 격자가 글자와 겹쳐 방해가 될 수 있어 숨김.
+ * 층이 숨겨지면 안쪽 canvas도 보이지 않으므로 sonar-grid.js가 알아채 다시 그리기를 멈춤.
+ */
+@media print, (forced-colors: active) {
+  .site-sonar {
+    display: none;
+  }
+}
+
+/*
  * 위쪽 메뉴 막대: ui.js가 #sidebar 안에 nav.navbar를 만들어 넣음.
  * HTML 이름은 sidebar지만 실제로는 화면 맨 위 가로 막대임.
  */
@@ -167,6 +202,46 @@ a:hover {
 
 .navbar-brand-accent {
   color: var(--color-orange);
+}
+
+/*
+ * 입자 로고(js/effects/particle-text.js)를 얹는 자리임. ui.js의 mountBrandParticles()가 만듦.
+ * brand-particles-word: FILMLOG 글자 줄을 감싼 span임. inline-block이라 높이가 글자 한 줄과 같고,
+ * position: relative라 안쪽 layer가 이 글자 줄을 기준으로 놓임. 메뉴 막대 높이와 배치는 바뀌지 않음.
+ */
+.brand-particles-word {
+  position: relative;
+  display: inline-block;
+}
+
+/*
+ * brand-particles-layer: 입자 canvas를 담는 빈 span임.
+ * inset 값이 음수라 글자 줄보다 위아래 12px, 좌우 14px 크게 펼쳐짐.
+ * 마우스에 밀린 점이 이 여유 공간 안에서 보이게 됨. canvas는 링크 안에 있으므로 눌러도 메인 페이지로 이동함.
+ */
+.brand-particles-layer {
+  position: absolute;
+  inset: -12px -14px;
+}
+
+/*
+ * canvas가 처음 그려진 뒤 ui.js가 링크에 brand-particles-ready 클래스를 붙임.
+ * 그때 진짜 글자를 투명하게 만들어 입자 로고만 보이게 함. 글자는 남아 있어 화면 읽기 프로그램은 그대로 읽음.
+ * LOG의 주황 글자색은 따로 정해져 있으므로 navbar-brand-accent도 함께 투명하게 함.
+ */
+.brand-particles-ready .brand-particles-word,
+.brand-particles-ready .navbar-brand-accent {
+  color: transparent;
+}
+
+/*
+ * 고대비(강제 색상) 모드에서는 브라우저가 글자색을 강제로 바꿔 투명 글자가 다시 보임.
+ * 이때 canvas까지 보이면 로고가 겹치므로 canvas 자리를 숨기고 진짜 글자 로고만 남김.
+ */
+@media (forced-colors: active) {
+  .brand-particles-layer {
+    display: none;
+  }
 }
 
 /* 메뉴 항목이 한 줄에 다 들어가지 않으면 다음 줄로 넘김. */

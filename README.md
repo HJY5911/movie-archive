@@ -35,6 +35,8 @@ catalog.json : 영화 제목, 개봉일, 상영 시간, 포스터 경로, 줄거
 
 포스터 이미지: TMDB(themoviedb.org) 이미지 주소를 그대로 연결함 (저장소에 내려받지 않음, 화면에 보이려면 인터넷 연결 필요)
 
+외부 코드: 로고 입자·첫 화면·지도 조준선 효과는 React Bits(MIT + Commons Clause), 모든 페이지의 배경 점 격자는 21st.dev의 Sonar Grid(MIT)를 옮겨 쓴 것으로, 출처와 라이선스 원문은 THIRD_PARTY_NOTICES.md에 있음
+
 영화 기본 정보는 catalog.json에서 불러오고, 사용자 프로필·감상 기록·사진은 브라우저의 IndexedDB에 저장
 
 

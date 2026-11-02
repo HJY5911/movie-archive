@@ -78,6 +78,23 @@ a:hover {
   color: var(--color-gray-700);
 }
 
+.site-sonar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100vh;
+  pointer-events: none;
+  color: var(--color-ink);
+}
+
+@media print, (forced-colors: active) {
+  .site-sonar {
+    display: none;
+  }
+}
+
 #sidebar {
   background: var(--color-ink);
 }
@@ -106,6 +123,27 @@ a:hover {
 
 .navbar-brand-accent {
   color: var(--color-orange);
+}
+
+.brand-particles-word {
+  position: relative;
+  display: inline-block;
+}
+
+.brand-particles-layer {
+  position: absolute;
+  inset: -12px -14px;
+}
+
+.brand-particles-ready .brand-particles-word,
+.brand-particles-ready .navbar-brand-accent {
+  color: transparent;
+}
+
+@media (forced-colors: active) {
+  .brand-particles-layer {
+    display: none;
+  }
 }
 
 #sidebar .navbar-nav {

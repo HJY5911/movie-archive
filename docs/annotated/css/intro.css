@@ -1,0 +1,463 @@
+/*
+  intro.css: 메인 페이지(index.html) 첫 화면인 영화 카메라 뷰파인더 소개 화면의 스타일임.
+  요소는 js/intro.js가 만들며, 클래스 이름은 모두 intro-로 시작하여 다른 페이지 스타일과 겹치지 않게 함.
+  React Bits ScrollExpand의 CSS(트랙, sticky 무대, clip-path 촬영 영역, 어두운 막)를 바탕으로 함.
+  원본 저작권 및 라이선스 고지는 THIRD_PARTY_NOTICES.md에 있음.
+  진행도에 따라 바뀌는 값(clip-path, 투명도, 확대, 흐림)은 JS가 style 속성으로 직접 넣음.
+  여기에는 처음 상태와 바뀌지 않는 모양만 적음.
+*/
+
+/* 첫 화면이 흰색으로 번쩍이지 않게 하는 규칙임. 이 CSS는 index.html만 불러옴. */
+/* JS 모듈(intro.js, index.js)을 받아 실행하기 전에는 #sidebar가 비어 있음(:empty). */
+/* 그동안 페이지 바탕을 검은색으로 두고 본문(.main-wrap)을 숨겨, 흰 바탕과 아래쪽 footer만 잠깐 보이는 일을 막음. */
+/* index.js가 #sidebar 안에 메뉴를 넣는 순간 :empty가 아니게 되어 두 규칙 모두 저절로 풀림. */
+body:has(> #sidebar:empty) {
+  background: var(--color-ink);
+}
+
+body:has(> #sidebar:empty) > .main-wrap {
+  visibility: hidden;
+}
+
+/* .intro: 스크롤 길이를 만드는 트랙임. JS가 높이를 화면 높이의 2.4배(px)로 다시 정함. */
+/* body가 flex 세로 배치이므로 flex: none으로 줄어들지 않게 함. */
+.intro {
+  position: relative;
+  flex: none;
+  width: 100%;
+  height: 240vh;
+  background: var(--color-ink);
+}
+
+/* .intro-stage: 트랙 안에서 화면 위에 붙어 있는 무대임(position: sticky). */
+/* overflow: hidden으로 화면보다 넓은 포스터 벽과 필름 입자가 가로 스크롤을 만들지 않게 함. */
+/* --intro-frame-width: 처음 촬영 영역 폭임. JS가 실제 값(px)으로 바꿔 넣음. */
+/* --intro-tile: 포스터 한 장의 폭, --intro-gap: 포스터 사이 간격임. 화면 폭에 비례하되 최소·최대를 둠. */
+.intro-stage {
+  --intro-frame-width: 70vw;
+  --intro-tile: clamp(96px, 11vw, 190px);
+  --intro-gap: clamp(8px, 0.9vw, 14px);
+  --intro-hud-color: rgba(255, 255, 255, 0.85);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-ink);
+  color: #ffffff;
+}
+
+/* .intro-grain: 촬영 영역 바깥의 필름 입자 무늬임. */
+/* SVG의 feTurbulence로 만든 잡음 그림을 배경으로 반복하고, feColorMatrix로 밝은 알갱이만 남김. */
+/* 무대보다 2배 크게 잡아 두고 0.6초마다 위치를 뚝뚝 바꿔 필름 입자가 떨리는 것처럼 보이게 함. */
+.intro-grain {
+  position: absolute;
+  inset: -50%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1.6 -0.55'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  opacity: 0.14;
+  pointer-events: none;
+  animation: intro-grain 0.6s steps(1, end) infinite;
+}
+
+/* steps(1, end): 중간 위치를 거치지 않고 다음 칸으로 바로 바뀜. */
+@keyframes intro-grain {
+  0% { transform: translate(0, 0); }
+  17% { transform: translate(-3%, 2%); }
+  33% { transform: translate(2%, -4%); }
+  50% { transform: translate(-4%, -1%); }
+  67% { transform: translate(3%, 3%); }
+  83% { transform: translate(-1%, 4%); }
+}
+
+/* .intro-frame: 카메라에 찍히는 촬영 영역임. clip-path의 inset으로 가운데 일부만 보이게 잘라 냄. */
+/* 아래 inset 값은 JS가 실행되기 전의 처음 모양이며, 실행 후에는 JS가 px 값으로 계속 바꿈. */
+.intro-frame {
+  position: absolute;
+  inset: 0;
+  background: #161616;
+  clip-path: inset(30% 15% round 2px);
+  will-change: clip-path;
+}
+
+/* .intro-frame::after: 촬영 영역 아래쪽 18vh를 검은색으로 서서히 어둡게 하는 띠임. */
+/* 촬영 영역 안쪽 요소라서 clip-path에 같이 잘림. 처음(작은 창)에는 잘린 바깥이라 보이지 않음. */
+/* 화면 전체로 넓어진 뒤 무대가 위로 밀려 나갈 때, 포스터 벽이 아래 메뉴(검은 띠)와 부드럽게 이어지게 함. */
+.intro-frame::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 18vh;
+  background: linear-gradient(rgba(11, 11, 11, 0), var(--color-ink));
+  pointer-events: none;
+}
+
+/* .intro-wall: 촬영 영역 안의 포스터 벽임. 여러 줄을 세로로 쌓고 가운데 정렬함. */
+/* will-change는 확대(transform)와 흐림(filter)이 자주 바뀐다고 브라우저에 미리 알림. */
+.intro-wall {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--intro-gap);
+  transform-origin: center;
+  will-change: transform, filter;
+}
+
+/* .intro-wall-row: 포스터 한 줄임. 같은 포스터 묶음이 두 번 들어 있어 50%만 옮겼다 돌아오면 끊김이 없음. */
+/* 짝수 줄은 반대 방향, 다른 속도로 흘러 화면이 천천히 패닝하는 것처럼 보임. */
+.intro-wall-row {
+  display: flex;
+  flex: none;
+  width: max-content;
+  animation: intro-pan 180s linear infinite;
+}
+
+.intro-wall-row:nth-child(even) {
+  animation-direction: reverse;
+  animation-duration: 220s;
+}
+
+@keyframes intro-pan {
+  to { transform: translateX(-50%); }
+}
+
+/* .intro-wall-poster: 포스터 한 칸임. 2:3 비율이며 이미지가 없거나 못 불러오면 회색 칸으로 남음. */
+/* 간격을 gap이 아니라 margin-right로 주어야 -50% 이동 거리와 묶음 하나의 폭이 정확히 같아짐. */
+.intro-wall-poster {
+  flex: none;
+  width: var(--intro-tile);
+  aspect-ratio: 2 / 3;
+  margin-right: var(--intro-gap);
+  background: #262626 center / cover no-repeat;
+}
+
+/* .intro-scrim: 포스터 위에 덮는 어두운 막임. 가운데보다 가장자리가 더 어두워 글자가 잘 읽힘. */
+/* 불투명도는 JS가 진행도에 따라 0.74에서 0.42로 낮춤. */
+.intro-scrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(11, 11, 11, 0.86), #0b0b0b 75%);
+  opacity: 0.74;
+}
+
+/* .intro-hud: 뷰파인더 표시를 담는 상자임. JS가 촬영 영역과 같은 inset을 넣어 영역 가장자리에 붙임. */
+/* 글자는 고정폭 글꼴로 작게 쓰고, tabular-nums로 타임코드 숫자 폭을 같게 맞춰 글자가 흔들리지 않게 함. */
+.intro-hud {
+  position: absolute;
+  inset: 30% 15%;
+  color: var(--intro-hud-color);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* .intro-corner: 네 모서리의 ㄱ자 표시임. 테두리 두 변만 그려서 만듦. */
+.intro-corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 0 solid var(--intro-hud-color);
+}
+
+.intro-corner-tl {
+  top: 12px;
+  left: 12px;
+  border-top-width: 1.5px;
+  border-left-width: 1.5px;
+}
+
+.intro-corner-tr {
+  top: 12px;
+  right: 12px;
+  border-top-width: 1.5px;
+  border-right-width: 1.5px;
+}
+
+.intro-corner-bl {
+  bottom: 12px;
+  left: 12px;
+  border-bottom-width: 1.5px;
+  border-left-width: 1.5px;
+}
+
+.intro-corner-br {
+  right: 12px;
+  bottom: 12px;
+  border-right-width: 1.5px;
+  border-bottom-width: 1.5px;
+}
+
+/* .intro-hud-row: 위쪽(REC, 타임코드)과 아래쪽(촬영 설정, 배터리) 글자 줄임. */
+/* 모서리 표시와 겹치지 않도록 양옆을 44px 띄우고 양 끝으로 벌려 배치함. */
+.intro-hud-row {
+  position: absolute;
+  right: 44px;
+  left: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.intro-hud-top {
+  top: 18px;
+}
+
+.intro-hud-bottom {
+  bottom: 18px;
+}
+
+.intro-rec,
+.intro-power {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* .intro-rec-dot: 녹화 중을 뜻하는 빨간 점임. 1.2초마다 켜졌다 흐려지기를 반복함. */
+/* 실제 카메라의 녹화 표시등처럼 밝은 빨강(#ff3b30)을 씀. 흐려지는 순간에도 25%는 남겨 점이 사라지지 않게 함. */
+.intro-rec-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff3b30;
+  animation: intro-blink 1.2s steps(1, end) infinite;
+}
+
+@keyframes intro-blink {
+  50% { opacity: 0.25; }
+}
+
+.intro-specs {
+  display: inline-flex;
+  gap: 1.4em;
+}
+
+/* .intro-battery: 배터리 모양임. 테두리 상자 안을 70%만 칠하고, ::after로 오른쪽 볼록한 단자를 붙임. */
+/* background-clip을 content-box로 두어 padding 1px만큼 테두리와 채움 사이를 띄움. */
+.intro-battery {
+  position: relative;
+  width: 18px;
+  height: 9px;
+  padding: 1px;
+  border: 1px solid currentColor;
+  border-radius: 1px;
+  background: linear-gradient(90deg, currentColor 70%, transparent 70%) content-box;
+}
+
+.intro-battery::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  right: -3px;
+  width: 2px;
+  height: 3px;
+  background: currentColor;
+}
+
+/* .intro-copy: 로고와 인용문을 무대 한가운데(=촬영 영역 한가운데)에 세로로 쌓음. */
+/* 투명도와 위로 올라가는 이동은 JS가 진행도에 따라 넣음. */
+.intro-copy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 2.4vh, 26px);
+  padding: 0 16px;
+  text-align: center;
+  will-change: opacity, transform;
+}
+
+.intro-logo {
+  position: relative;
+  z-index: 0;
+  margin: 0;
+}
+
+/* .intro-logo-word: 진짜 FILMLOG 글자임. 화면 폭의 10%(높이의 16%를 넘지 않게)로 56~150px 사이에서 정해짐. */
+/* 입자 효과 모듈이 이 글자의 크기와 자간을 읽어 같은 위치에 입자 글자를 그림. */
+.intro-logo-word {
+  position: relative;
+  display: inline-block;
+  color: #ffffff;
+  font-family: "Anton", var(--bs-body-font-family);
+  font-size: clamp(56px, min(10vw, 16vh), 150px);
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.intro-logo-accent {
+  color: var(--color-orange);
+}
+
+/* 입자가 모이기 전에 진짜 글자가 먼저 번쩍 보이는 일을 막는 규칙임. */
+/* 1.5초 기다리는(delay) 동안 backwards 채우기로 첫 장면(from)의 투명 색을 적용함. */
+/* 그 사이 입자가 그려지면 .intro-logo-ready가 글자를 계속 투명하게 둠. */
+/* canvas가 끝내 준비되지 않으면 1.5초 뒤 원래 색으로 돌아와 진짜 글자가 보임. */
+.intro-logo-word,
+.intro-logo-accent {
+  animation: intro-logo-wait 0s linear 1.5s backwards;
+}
+
+@keyframes intro-logo-wait {
+  from { color: transparent; }
+}
+
+/* .intro-logo-layer: 입자 canvas가 들어가는 층임. 글자보다 위아래 1em, 양옆 1.1em 넓게 잡음. */
+/* 등장할 때 흩어진 입자나 눌러서 퍼진 입자가 canvas 가장자리에서 잘리지 않게 하려는 것임. */
+.intro-logo-layer {
+  position: absolute;
+  inset: -1em -1.1em;
+}
+
+/* 입자를 처음 그린 뒤 JS가 intro-logo-ready를 붙이면 진짜 글자를 투명하게 함. */
+/* 글자 자리는 그대로 남으므로 배치가 바뀌지 않고 화면 읽기 프로그램도 글자를 읽음. */
+.intro-logo-ready,
+.intro-logo-ready .intro-logo-accent {
+  color: transparent;
+}
+
+/* .intro-quote: 인용문임. 로고의 넓은 canvas보다 위에 오도록 z-index를 1로 둠(글자 선택 가능). */
+/* 최대 폭은 처음 촬영 영역 폭에서 양쪽 24px씩 뺀 값이며, keep-all로 낱말 중간에서 줄이 바뀌지 않게 함. */
+.intro-quote {
+  position: relative;
+  z-index: 1;
+  max-width: calc(var(--intro-frame-width) - 48px);
+  margin: 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: clamp(14px, 1.3vw, 19px);
+  font-weight: 300;
+  line-height: 1.75;
+  letter-spacing: -0.01em;
+  word-break: keep-all;
+}
+
+/* 두 문장을 한 줄씩 나누고, 좁은 화면에서는 balance로 줄 길이를 고르게 나눔. */
+.intro-quote-line {
+  display: block;
+  text-wrap: balance;
+}
+
+/* .intro-hint: 화면 아래의 스크롤 안내임. 얇은 꺾쇠(테두리 두 변을 45도 회전)가 천천히 위아래로 움직임. */
+.intro-hint {
+  position: absolute;
+  right: 0;
+  bottom: clamp(14px, 4vh, 36px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+.intro-hint-arrow {
+  width: 9px;
+  height: 9px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(45deg);
+  animation: intro-bob 2.4s ease-in-out infinite;
+}
+
+@keyframes intro-bob {
+  50% { transform: translate(3px, 3px) rotate(45deg); }
+}
+
+/* .intro-skip: 오른쪽 위의 건너뛰기 버튼임. 촬영 영역 밖에 두고 z-index로 다른 층보다 위에 놓음. */
+/* 화면 전체에 밝은 포스터가 깔려도 읽히도록 반투명 검은 바탕을 깔고, 누르기 쉽게 안쪽 여백을 넉넉히 줌. */
+/* 글자 버튼이라는 것이 보이도록 옅은 밑줄을 두고, 마우스를 올리면 밑줄과 글자를 진하게 함. */
+.intro-skip {
+  position: absolute;
+  top: clamp(12px, 3vh, 24px);
+  right: clamp(16px, 3vw, 32px);
+  z-index: 2;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 2px;
+  background: rgba(11, 11, 11, 0.72);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.35);
+  text-underline-offset: 4px;
+}
+
+.intro-skip:hover {
+  color: #ffffff;
+  text-decoration-color: currentColor;
+}
+
+/* 소개 화면이 화면 밖에 있거나 탭이 숨겨지면 JS가 intro-paused를 붙여 움직임을 일시 정지함. */
+.intro-paused .intro-grain,
+.intro-paused .intro-wall-row,
+.intro-paused .intro-rec-dot,
+.intro-paused .intro-hint-arrow {
+  animation-play-state: paused;
+}
+
+/* 좁은 화면: 뷰파인더 글자와 모서리 표시를 줄이고, 로고를 화면 폭의 19%(56~84px)로 키움. */
+@media (max-width: 767.98px) {
+  .intro-hud {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+
+  .intro-corner {
+    width: 16px;
+    height: 16px;
+  }
+
+  .intro-hud-row {
+    right: 30px;
+    left: 30px;
+  }
+
+  .intro-hud-top {
+    top: 14px;
+  }
+
+  .intro-hud-bottom {
+    bottom: 14px;
+  }
+
+  .intro-specs {
+    gap: 0.9em;
+  }
+
+  .intro-logo-word {
+    font-size: clamp(56px, 19vw, 84px);
+  }
+}
+
+/* 움직임 줄이기 설정: 필름 입자, 포스터 흐름, REC 깜빡임, 안내 꺾쇠 움직임을 모두 끔. */
+@media (prefers-reduced-motion: reduce) {
+  .intro-grain,
+  .intro-wall-row,
+  .intro-rec-dot,
+  .intro-hint-arrow {
+    animation: none;
+  }
+}
+
+/* 고대비 모드: canvas를 숨기고 진짜 글자만 보이게 함(이 모드에서는 투명 글자색이 무시됨). */
+@media (forced-colors: active) {
+  .intro-logo-layer {
+    display: none;
+  }
+}

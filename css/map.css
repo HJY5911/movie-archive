@@ -69,6 +69,7 @@
 .map-canvas {
   position: relative;
   margin-top: 48px;
+  cursor: crosshair;
 }
 
 .map-canvas img {
@@ -181,6 +182,10 @@
 
 .map-canvas .map-pin:focus-visible .map-pin-label {
   top: calc(120.7% + 14px);
+}
+
+.map-crosshair-on .map-pin:hover .map-pin-label {
+  visibility: hidden;
 }
 
 .map-country-panel .muted {

@@ -1,4 +1,6 @@
 import { loadCatalog, openRepository, readSnapshot } from './repository.js';
+import { createParticleText } from './effects/particle-text.js';
+import { createSonarGrid } from './effects/sonar-grid.js';
 
 export function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -89,10 +91,88 @@ const navigation = [
   ['series', '시리즈'], ['map', '지도']
 ];
 
+function isFirstBrandView() {
+  let first = false;
+  try {
+    if (sessionStorage.getItem('filmlog-brand-gathered') === null) {
+      sessionStorage.setItem('filmlog-brand-gathered', 'yes');
+      first = true;
+    }
+  } catch (error) {
+    first = false;
+  }
+  return first;
+}
+
+function mountBrandParticles(brand, word) {
+  const layer = el('span', { className: 'brand-particles-layer' });
+  word.append(layer);
+  let intro = 'none';
+  if (isFirstBrandView()) {
+    intro = 'gather';
+  }
+
+  function readFontSize() {
+    return parseFloat(getComputedStyle(word).fontSize);
+  }
+
+  function showParticles() {
+    brand.classList.add('brand-particles-ready');
+  }
+
+  const style = getComputedStyle(word);
+  createParticleText(layer, {
+    segments: [{ text: 'FILM', color: '#FFFFFF' }, { text: 'LOG', color: '#FF5A00' }],
+    fontFamily: style.fontFamily,
+    fontWeight: 400,
+    fontSize: readFontSize,
+    letterSpacing: parseFloat(style.letterSpacing) || 0,
+    step: 1.5,
+    particleSize: 1,
+    intro: intro,
+    scatter: 14,
+    gatherDuration: 900,
+    stagger: 450,
+    pointerRepel: 4,
+    repelRadius: 16,
+    clickBurst: false,
+    highlightColor: '#FF5A00',
+    onReady: showParticles
+  });
+}
+
+const SONAR_QUIET_TARGETS = 'a, button, input, select, textarea, label, summary, dialog, [role], [tabindex]:not([tabindex="-1"]), [contenteditable], img, video, canvas, iframe, .intro, .map-canvas';
+
+function mountSonarGrid() {
+  const tokens = getComputedStyle(document.documentElement);
+  const layer = el('div', { className: 'site-sonar' });
+  layer.setAttribute('aria-hidden', 'true');
+  document.body.prepend(layer);
+  createSonarGrid(layer, {
+    color: tokens.getPropertyValue('--color-ink').trim(),
+    ringColor: tokens.getPropertyValue('--color-orange').trim(),
+    spacing: 26,
+    dotRadius: 1.1,
+    baseOpacity: 0.16,
+    peakOpacity: 0.42,
+    amplitude: 1.1,
+    ringWidth: 90,
+    speed: 260,
+    pingEvery: 6,
+    pingRest: 3,
+    maxRings: 4,
+    pingArea: [0.1, 0.15, 0.9, 0.85],
+    pingSource: document,
+    ignoreSelector: SONAR_QUIET_TARGETS,
+    watch: document.querySelector('.main-wrap')
+  });
+}
+
 function mountShell(page) {
   const nav = el('nav', { className: 'navbar navbar-expand site-navbar', ariaLabel: '주 메뉴', dataset: { bsTheme: 'dark' } });
   const shell = el('div', { className: 'container-xl' });
-  const brand = el('a', { className: 'navbar-brand', href: 'index.html' }, 'FILM', el('span', { className: 'navbar-brand-accent' }, 'LOG'));
+  const word = el('span', { className: 'brand-particles-word' }, 'FILM', el('span', { className: 'navbar-brand-accent' }, 'LOG'));
+  const brand = el('a', { className: 'navbar-brand', href: 'index.html' }, word);
   const list = el('ul', { className: 'navbar-nav' });
   for (const [key, title] of navigation) {
     const active = key === page || page === 'movie' && key === 'movies';
@@ -103,6 +183,8 @@ function mountShell(page) {
   shell.append(brand, list);
   nav.append(shell);
   document.querySelector('#sidebar').replaceChildren(nav);
+  mountBrandParticles(brand, word);
+  mountSonarGrid();
 
   const topbar = document.querySelector('#topbar');
   topbar.replaceChildren(el('p', {}, '저장 위치: 현재 브라우저'));

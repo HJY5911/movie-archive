@@ -6,6 +6,8 @@
  * 2. 국가별 영화 ID 목록을 만들고, 영화 수가 많은 순서로 국가 순위를 정함.
  * 3. 각 국가의 위도·경도를 지도 이미지 위의 % 위치로 바꿔 핀 버튼을 놓음.
  * 4. 핀이나 순위 버튼을 누르면 그 국가의 영화 목록(포스터·개봉 연도·감상 횟수)을 보여줌.
+ * 5. 마우스를 쓰는 화면에서는 지도 위에 조준선(js/effects/crosshair.js)을 띄워 핀을 고르기 쉽게 함.
+ *    조준선은 마우스 아래 지점의 위도·경도를 보여주고, 핀 위에서는 핀을 주황 잠금 상자로 감싸 국가 이름과 영화 수를 보여줌.
  *
  * 이 페이지는 기록을 읽는 화면임. 모드를 바꾸거나 국가를 선택해도 저장소의 기록은 바뀌지 않음.
  * 기록 추가·수정·삭제는 movie.js가 담당하는 영화 상세 페이지(movie.html)에서 수행함.
@@ -24,6 +26,9 @@ import { boot, el } from '../ui.js';
 // buildProjections(catalog, 기록 배열)는 감상 기록으로 여러 통계를 한 번에 계산해 객체로 반환함.
 // 이 페이지는 그중 국가 코드별 감상 영화 ID 목록인 country_movies만 사용함.
 import { buildProjections } from '../selectors.js';
+// createCrosshair(container, options)는 container 위에 조준선 canvas를 만들고 { destroy }를 반환함.
+// React Bits의 Crosshair를 순수 JavaScript로 옮긴 모듈이며, 자세한 설명은 docs/annotated/js/effects/crosshair.js에 있음.
+import { createCrosshair } from '../effects/crosshair.js';
 
 // mode는 지도에 표시할 영화의 기준임. 'watched'는 감상한 영화, 'all'은 등록된 전체 영화임.
 // let은 나중에 값을 다시 대입할 수 있는 변수임. 처음 열면 감상한 영화 기준으로 보여줌.
@@ -32,6 +37,9 @@ let mode = 'watched';
 // 두 변수는 renderMap 밖(모듈 범위)에 있으므로 refresh()로 화면을 다시 그려도 값이 유지됨.
 // 브라우저에서 페이지 자체를 새로고침하면 모듈이 다시 실행되므로 처음 값으로 돌아감.
 let selectedCode = null;
+// crosshairResume은 직전 조준선이 사라질 때 남긴 상태임. 핀을 눌러 지도를 다시 그려도 조준선이 끊기지 않게 이어받을 때 씀.
+// null은 이어받을 상태가 없다는 뜻임.
+let crosshairResume = null;
 
 /*
  * toMapPosition(lat, lng): 위도·경도를 지도 이미지 안의 위치(%)로 바꿈.
@@ -51,6 +59,123 @@ function toMapPosition(lat, lng) {
   const top = (90 - lat) / 180 * 100;
   // 두 값을 객체로 묶어 반환함. 호출한 쪽에서 position.left, position.top으로 읽음.
   return { left: left, top: top };
+}
+
+/*
+ * toLatLng(leftRatio, topRatio): toMapPosition을 거꾸로 계산해 지도 위 위치(0~1 비율)를 위도·경도로 바꿈.
+ * leftRatio: 지도 왼쪽 끝 0 ~ 오른쪽 끝 1, topRatio: 위쪽 끝 0 ~ 아래쪽 끝 1임.
+ * 반환값: { lat: 위도, lng: 경도 } 객체임.
+ * 예: toLatLng(0.5, 0.5) → { lat: 0, lng: 0 }
+ * 예: toLatLng(0.8528, 0.2911) → { lat: 약 37.6, lng: 약 127.0 }
+ */
+function toLatLng(leftRatio, topRatio) {
+  // left% = (경도 + 180) / 360 이므로 경도 = 비율 × 360 - 180임.
+  const lng = leftRatio * 360 - 180;
+  // top% = (90 - 위도) / 180 이므로 위도 = 90 - 비율 × 180임.
+  const lat = 90 - topRatio * 180;
+  // 두 값을 객체로 묶어 반환함.
+  return { lat: lat, lng: lng };
+}
+
+/*
+ * formatDegree(value, positive, negative): 각도를 소수 첫째 자리까지의 '37.6°N' 같은 글자로 바꿈.
+ * value가 0 이상이면 positive(N 또는 E), 음수이면 negative(S 또는 W)를 붙이고 숫자는 절댓값으로 씀.
+ * 예: formatDegree(-33.87, 'N', 'S') → '33.9°S'
+ */
+function formatDegree(value, positive, negative) {
+  // 기본은 북쪽·동쪽 기호임.
+  let direction = positive;
+  // 음수이면 남쪽·서쪽 기호로 바꿈.
+  if (value < 0) {
+    direction = negative;
+  }
+  // Math.abs는 절댓값, toFixed(1)은 소수 첫째 자리까지 반올림한 문자열을 반환함.
+  return Math.abs(value).toFixed(1) + '°' + direction;
+}
+
+/*
+ * mapReadout(leftRatio, topRatio, head): 조준선 옆에 표시할 글자를 만듦. crosshair.js가 매 프레임 호출함.
+ * head가 null이 아니면(마우스가 핀 머리 위에 있으면) 그 핀의 이름표 글자를 그대로 반환함. 예: '대한민국 · 3편'
+ * head가 null이면 조준선 위치의 위도·경도를 반환함. 예: '37.6°N 127.0°E'
+ * 국가 이름은 핀을 만들 때 넣은 이름표에서 읽으므로 여기서 국가 목록을 따로 적지 않음.
+ */
+function mapReadout(leftRatio, topRatio, head) {
+  // 마우스가 핀 위에 있을 때임. head는 핀 머리(span.map-pin-head)이므로 closest()로 바깥 핀 버튼을 찾음.
+  if (head !== null) {
+    const pin = head.closest('.map-pin');
+    // 핀 버튼 안의 이름표(span.map-pin-label)를 찾음.
+    const label = pin.querySelector('.map-pin-label');
+    // 이름표가 있으면 그 글자를 반환함.
+    if (label !== null) {
+      return label.textContent;
+    }
+    // 이름표가 없으면 화면 낭독기용 이름(aria-label)을 대신 반환함.
+    return pin.getAttribute('aria-label');
+  }
+  // 핀 밖이면 위치 비율을 위도·경도로 바꿈.
+  const point = toLatLng(leftRatio, topRatio);
+  // 위도는 N/S, 경도는 E/W 기호를 붙여 한 줄로 이어 반환함.
+  return formatDegree(point.lat, 'N', 'S') + ' ' + formatDegree(point.lng, 'E', 'W');
+}
+
+/*
+ * cssColor(name): common.css의 :root에 정의된 색 변수 값을 읽어 문자열로 반환함.
+ * canvas는 var(--color-ink) 같은 CSS 변수를 직접 이해하지 못하므로 실제 색 값으로 바꿔서 넘겨야 함.
+ * 예: cssColor('--color-orange') → '#ff5a00'
+ */
+function cssColor(name) {
+  // getComputedStyle은 실제로 적용된 스타일을 읽음. trim()으로 앞뒤 공백을 지움.
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+/*
+ * startCrosshair(stage): 지도 상자(stage) 위에 조준선을 만들고, 조준선을 지우는 함수를 반환함.
+ * 터치 화면처럼 마우스가 없는 기기에서는 조준선을 만들지 않고 undefined를 반환함.
+ * 반환한 함수는 renderMap이 그대로 반환하며, ui.js의 boot()가 화면을 다시 그리기 직전과 페이지를 떠날 때 호출함.
+ * 그래서 모드를 바꾸거나 핀을 눌러 지도를 다시 그려도 canvas와 이벤트 연결이 겹쳐 쌓이지 않음.
+ */
+function startCrosshair(stage) {
+  // (hover: hover)는 화면 위에 떠 있을 수 있는 포인터, (pointer: fine)은 마우스처럼 정밀한 포인터가 있다는 뜻임.
+  // 둘 중 하나라도 아니면(휴대폰·태블릿 등) 조준선을 만들지 않음. 핀은 그대로 눌러서 고를 수 있음.
+  if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    return undefined;
+  }
+  // 조준선 설정값임. 지도 위에서 핀을 고르는 조준경처럼 보이도록 정함.
+  const crosshair = createCrosshair(stage, {
+    // canvas 클래스 이름임. map.css가 조준선이 켜졌을 때 붙는 map-crosshair-on을 사용함.
+    className: 'map-crosshair',
+    // 선과 좌표 표시는 사이트의 검정(--color-ink), 잠금 상자는 주황(--color-orange)을 씀.
+    color: cssColor('--color-ink'),
+    lockColor: cssColor('--color-orange'),
+    // 1px 선을 45% 불투명도로 그려 지도를 가리지 않게 함.
+    thickness: 1,
+    opacity: 0.45,
+    // 교차점 둘레 10px을 비워 마우스 아래 지점이 선에 가리지 않게 함.
+    gap: 10,
+    // 0.2는 약하게 따라오는 정도임. 손떨림은 줄이되 늦게 따라온다는 느낌이 들지 않을 만큼만 부드럽게 함.
+    smoothing: 0.2,
+    // 핀 머리(.map-pin-head)에 마우스가 올라가면 잠금 상자를 그림. 상자는 머리 span(둥근 머리 부분과 같은 정사각형)에 사방 6px 여백을 더한 크기임.
+    // 핀 버튼과 머리 span은 pointer-events: none이고, 눈에 보이는 물방울(머리의 ::before)만 마우스를 받음.
+    // ::before 위에서 일어난 마우스 이벤트는 그 ::before를 가진 머리 span의 이벤트로 처리되므로, 머리를 잠금 대상으로 삼음.
+    targetSelector: '.map-pin-head',
+    // 표시 글자는 위의 mapReadout 함수가 만듦. 함수 이름만 넘기고 호출은 crosshair.js가 함.
+    readout: mapReadout,
+    // 시스템 마우스 커서는 숨기지 않음(map.css의 crosshair·pointer 커서가 그대로 보임).
+    // 운영체제에서 커서를 크게 키운 사용자도 지도 위에서 커서를 잃지 않게 하려는 것임.
+    // 누른 자리에 퍼지는 원을 그림.
+    clickPulse: true,
+    // 직전 조준선의 상태를 이어받음.
+    resume: crosshairResume
+  });
+  // 한 번 이어받은 상태는 다시 쓰지 않도록 비움.
+  crosshairResume = null;
+
+  // stopCrosshair(): 조준선을 지우고, 다음에 만들 조준선이 이어받을 상태를 저장함.
+  function stopCrosshair() {
+    crosshairResume = crosshair.destroy();
+  }
+  // 함수를 실행하지 않고 함수 자체를 반환함.
+  return stopCrosshair;
 }
 
 /*
@@ -136,7 +261,8 @@ function compareRanking(a, b) {
 /*
  * renderMap(context): 현재 mode·selectedCode와 기록에 맞게 지도 페이지 본문을 만듦.
  * context는 ui.js의 boot()가 전달하는 객체임. 필요한 항목을 아래에서 하나씩 꺼냄.
- * 별도의 반환값은 없으며 마지막에 app.replaceChildren()으로 화면을 바꿈.
+ * 마지막에 app.replaceChildren()으로 화면을 바꾸고, 지도 조준선을 지우는 함수(startCrosshair의 반환값)를 반환함.
+ * boot()는 다음에 다시 그리기 직전에 이 반환값을 호출해 이전 조준선을 정리함.
  * 최초 실행 때와 refresh()를 호출했을 때 이 함수가 다시 실행되어 페이지 본문 전체를 새로 만듦.
  */
 function renderMap(context) {
@@ -501,7 +627,9 @@ function renderMap(context) {
     // 제목과 지도 영역만으로 본문을 교체함.
     app.replaceChildren(heading, layout);
     // return으로 renderMap을 여기서 끝냄. 아래의 국가별 영화 목록과 순위는 만들지 않음.
-    return;
+    // 지도는 화면에 있으므로 조준선은 만들고, 조준선을 지우는 함수를 반환함.
+    // 화면에 붙인 뒤에 만들어야 지도 크기와 마우스 위치를 바로 잴 수 있음.
+    return startCrosshair(canvas);
   }
 
   // 선택한 국가의 영화 목록을 담을 section임.
@@ -644,6 +772,8 @@ function renderMap(context) {
   // replaceChildren은 app 자체는 유지하고 기존 본문 자식만 새 요소들로 교체함.
   // 로딩 표시 또는 이전 지도 화면이 사라지고 새 화면이 나타남. DB의 기록은 삭제하지 않음.
   app.replaceChildren(heading, layout);
+  // 새 지도가 화면에 붙은 뒤 조준선을 만들고, 조준선을 지우는 함수를 boot()에 반환함.
+  return startCrosshair(canvas);
 }
 
 // 준비 함수에 화면을 그릴 함수의 이름을 전달함. renderMap()으로 즉시 호출하지 않음.
