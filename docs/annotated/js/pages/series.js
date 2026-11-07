@@ -52,7 +52,8 @@ function directorNames(catalog, movieId) {
     // personById는 repository.js가 만들어 둔 '인물ID → 인물 정보' Map임.
     const person = catalog.lookup.personById.get(credit.person_id);
     if (person !== undefined) {
-      names.push(person.name);
+      // 이름 안의 띄어쓰기를 줄바꿈 없는 공백(\u00a0)으로 바꿈. 좁은 화면에서 '피트 / 닥터'처럼 이름 중간에서 줄이 바뀌지 않게 하기 위함임.
+      names.push(person.name.replaceAll(' ', '\u00a0'));
     }
   }
   return names;
@@ -72,12 +73,21 @@ function formatRuntime(minutes) {
   return hours + '시간 ' + rest + '분';
 }
 
-// 영화 제목 뒤에 붙일 조사(을/를)를 고름. '달빛 우체국을', '사랑의 노래를'처럼 받침에 맞춤.
+// 영화 제목 뒤에 붙일 조사(을/를)를 고름. '트레인스포팅을', '룩백을', '시간을 달리는 소녀를'처럼 받침에 맞춤.
 // 한글 글자는 유니코드에서 0xAC00(가)부터 0xD7A3(힣)까지 일정한 규칙으로 놓여 있음.
 // (글자 코드 - 0xAC00)을 28로 나눈 나머지가 0이면 받침이 없는 글자임.
 function objectParticle(word) {
+  // 제목이 숫자로 끝나면(예: 'T2: 트레인스포팅 2') 숫자를 한국어로 읽은 소리로 받침을 정함.
+  // 2(이)·4(사)·5(오)·9(구)는 받침이 없어 '를', 0(영)·1(일)·3(삼)·6(육)·7(칠)·8(팔)은 받침이 있어 '을'임.
+  const last = word.charAt(word.length - 1);
+  if ('0123456789'.includes(last)) {
+    if ('2459'.includes(last)) {
+      return '를';
+    }
+    return '을';
+  }
   const code = word.charCodeAt(word.length - 1);
-  // 마지막 글자가 한글이 아니면(숫자·영어 등) 받침을 판단할 수 없어 '을(를)'로 둠.
+  // 마지막 글자가 숫자도 한글도 아니면(영어 등) 받침을 판단할 수 없어 '을(를)'로 둠.
   if (code < 0xAC00 || code > 0xD7A3) {
     return '을(를)';
   }
@@ -179,7 +189,8 @@ function renderStep(catalog, step, nextStep, watchCounts) {
   }
   const directors = directorNames(catalog, movie.movie_id);
   if (directors.length > 0) {
-    info.push('감독 ' + directors.join(', '));
+    // '감독'과 첫 이름 사이도 줄바꿈 없는 공백으로 이어 '감독'만 줄 끝에 홀로 남지 않게 함. 이름과 이름 사이(', ')에서는 줄을 바꿀 수 있음.
+    info.push('감독\u00a0' + directors.join(', '));
   }
 
   let statusText = '아직 감상 전';

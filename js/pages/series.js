@@ -23,7 +23,7 @@ function directorNames(catalog, movieId) {
     }
     const person = catalog.lookup.personById.get(credit.person_id);
     if (person !== undefined) {
-      names.push(person.name);
+      names.push(person.name.replaceAll(' ', '\u00a0'));
     }
   }
   return names;
@@ -42,6 +42,13 @@ function formatRuntime(minutes) {
 }
 
 function objectParticle(word) {
+  const last = word.charAt(word.length - 1);
+  if ('0123456789'.includes(last)) {
+    if ('2459'.includes(last)) {
+      return '를';
+    }
+    return '을';
+  }
   const code = word.charCodeAt(word.length - 1);
   if (code < 0xAC00 || code > 0xD7A3) {
     return '을(를)';
@@ -128,7 +135,7 @@ function renderStep(catalog, step, nextStep, watchCounts) {
   }
   const directors = directorNames(catalog, movie.movie_id);
   if (directors.length > 0) {
-    info.push('감독 ' + directors.join(', '));
+    info.push('감독\u00a0' + directors.join(', '));
   }
 
   let statusText = '아직 감상 전';

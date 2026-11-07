@@ -6,6 +6,8 @@
  * 2. 국가별 영화 ID 목록을 만들고, 영화 수가 많은 순서로 국가 순위를 정함.
  * 3. 각 국가의 위도·경도를 지도 이미지 위의 % 위치로 바꿔 핀 버튼을 놓음.
  * 4. 핀이나 순위 버튼을 누르면 그 국가의 영화 목록(포스터·개봉 연도·감상 횟수)을 보여줌.
+ * 5. 마우스를 쓰는 화면에서는 지도 위에 조준선(js/effects/crosshair.js)을 띄워 핀을 고르기 쉽게 함.
+ *    조준선은 마우스 아래 지점의 위도·경도를 보여주고, 핀 위에서는 핀을 주황 잠금 상자로 감싸 국가 이름과 영화 수를 보여줌.
  *
  * 이 페이지는 기록을 읽는 화면임. 모드를 바꾸거나 국가를 선택해도 저장소의 기록은 바뀌지 않음.
  * 기록 추가·수정·삭제는 movie.js가 담당하는 영화 상세 페이지(movie.html)에서 수행함.
@@ -24,6 +26,9 @@ import { boot, el } from '../ui.js';
 // buildProjections(catalog, 기록 배열)는 감상 기록으로 여러 통계를 한 번에 계산해 객체로 반환함.
 // 이 페이지는 그중 국가 코드별 감상 영화 ID 목록인 country_movies만 사용함.
 import { buildProjections } from '../selectors.js';
+// createCrosshair(container, options)는 container 위에 조준선 canvas를 만들고 { destroy }를 반환함.
+// React Bits의 Crosshair를 순수 JavaScript로 옮긴 모듈이며, 자세한 설명은 docs/annotated/js/effects/crosshair.js에 있음.
+import { createCrosshair } from '../effects/crosshair.js';
 
 import { arrangeMapPins } from '../map-layout.js';
 
@@ -34,6 +39,9 @@ let mode = 'watched';
 // 두 변수는 renderMap 밖(모듈 범위)에 있으므로 refresh()로 화면을 다시 그려도 값이 유지됨.
 // 브라우저에서 페이지 자체를 새로고침하면 모듈이 다시 실행되므로 처음 값으로 돌아감.
 let selectedCode = null;
+// crosshairResume은 직전 조준선이 사라질 때 남긴 상태임. 핀을 눌러 지도를 다시 그려도 조준선이 끊기지 않게 이어받을 때 씀.
+// null은 이어받을 상태가 없다는 뜻임.
+let crosshairResume = null;
 
 /*
  * toMapPosition(lat, lng): 위도·경도를 지도 이미지 안의 위치(%)로 바꿈.
@@ -56,10 +64,327 @@ function toMapPosition(lat, lng) {
 }
 
 /*
+ * toLatLng(leftRatio, topRatio): toMapPosition을 거꾸로 계산해 지도 위 위치(0~1 비율)를 위도·경도로 바꿈.
+ * leftRatio: 지도 왼쪽 끝 0 ~ 오른쪽 끝 1, topRatio: 위쪽 끝 0 ~ 아래쪽 끝 1임.
+ * 반환값: { lat: 위도, lng: 경도 } 객체임.
+ * 예: toLatLng(0.5, 0.5) → { lat: 0, lng: 0 }
+ * 예: toLatLng(0.8528, 0.2911) → { lat: 약 37.6, lng: 약 127.0 }
+ */
+function toLatLng(leftRatio, topRatio) {
+  // left% = (경도 + 180) / 360 이므로 경도 = 비율 × 360 - 180임.
+  const lng = leftRatio * 360 - 180;
+  // top% = (90 - 위도) / 180 이므로 위도 = 90 - 비율 × 180임.
+  const lat = 90 - topRatio * 180;
+  // 두 값을 객체로 묶어 반환함.
+  return { lat: lat, lng: lng };
+}
+
+/*
+ * formatDegree(value, positive, negative): 각도를 소수 첫째 자리까지의 '37.6°N' 같은 글자로 바꿈.
+ * value가 0 이상이면 positive(N 또는 E), 음수이면 negative(S 또는 W)를 붙이고 숫자는 절댓값으로 씀.
+ * 예: formatDegree(-33.87, 'N', 'S') → '33.9°S'
+ */
+function formatDegree(value, positive, negative) {
+  // 기본은 북쪽·동쪽 기호임.
+  let direction = positive;
+  // 음수이면 남쪽·서쪽 기호로 바꿈.
+  if (value < 0) {
+    direction = negative;
+  }
+  // Math.abs는 절댓값, toFixed(1)은 소수 첫째 자리까지 반올림한 문자열을 반환함.
+  return Math.abs(value).toFixed(1) + '°' + direction;
+}
+
+/*
+ * mapReadout(leftRatio, topRatio, head): 조준선 옆에 표시할 글자를 만듦. crosshair.js가 매 프레임 호출함.
+ * head가 null이 아니면(마우스가 핀 머리 위에 있으면) 그 핀의 이름표 글자를 그대로 반환함. 예: '대한민국 · 3편'
+ * head가 null이면 조준선 위치의 위도·경도를 반환함. 예: '37.6°N 127.0°E'
+ * 국가 이름은 핀을 만들 때 넣은 이름표에서 읽으므로 여기서 국가 목록을 따로 적지 않음.
+ */
+function mapReadout(leftRatio, topRatio, head) {
+  // 마우스가 핀 위에 있을 때임. head는 핀 머리(span.map-pin-head)이므로 closest()로 바깥 핀 버튼을 찾음.
+  if (head !== null) {
+    const pin = head.closest('.map-pin');
+    // 핀 버튼 안의 이름표(span.map-pin-label)를 찾음.
+    const label = pin.querySelector('.map-pin-label');
+    // 이름표가 있으면 그 글자를 반환함.
+    if (label !== null) {
+      return label.textContent;
+    }
+    // 이름표가 없으면 화면 낭독기용 이름(aria-label)을 대신 반환함.
+    return pin.getAttribute('aria-label');
+  }
+  // 핀 밖이면 위치 비율을 위도·경도로 바꿈.
+  const point = toLatLng(leftRatio, topRatio);
+  // 위도는 N/S, 경도는 E/W 기호를 붙여 한 줄로 이어 반환함.
+  return formatDegree(point.lat, 'N', 'S') + ' ' + formatDegree(point.lng, 'E', 'W');
+}
+
+/*
+ * cssColor(name): common.css의 :root에 정의된 색 변수 값을 읽어 문자열로 반환함.
+ * canvas는 var(--color-ink) 같은 CSS 변수를 직접 이해하지 못하므로 실제 색 값으로 바꿔서 넘겨야 함.
+ * 예: cssColor('--color-orange') → '#ff5a00'
+ */
+function cssColor(name) {
+  // getComputedStyle은 실제로 적용된 스타일을 읽음. trim()으로 앞뒤 공백을 지움.
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+/*
+ * startCrosshair(stage): 지도 상자(stage) 위에 조준선을 만들고, 조준선을 지우는 함수를 반환함.
+ * 터치 화면처럼 마우스가 없는 기기에서는 조준선을 만들지 않고 undefined를 반환함.
+ * 반환한 함수는 renderMap이 그대로 반환하며, ui.js의 boot()가 화면을 다시 그리기 직전과 페이지를 떠날 때 호출함.
+ * 그래서 모드를 바꾸거나 핀을 눌러 지도를 다시 그려도 canvas와 이벤트 연결이 겹쳐 쌓이지 않음.
+ */
+function startCrosshair(stage) {
+  // (hover: hover)는 화면 위에 떠 있을 수 있는 포인터, (pointer: fine)은 마우스처럼 정밀한 포인터가 있다는 뜻임.
+  // 둘 중 하나라도 아니면(휴대폰·태블릿 등) 조준선을 만들지 않음. 핀은 그대로 눌러서 고를 수 있음.
+  if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    return undefined;
+  }
+  // 조준선 설정값임. 지도 위에서 핀을 고르는 조준경처럼 보이도록 정함.
+  const crosshair = createCrosshair(stage, {
+    // canvas 클래스 이름임. map.css가 조준선이 켜졌을 때 붙는 map-crosshair-on을 사용함.
+    className: 'map-crosshair',
+    // 선과 좌표 표시는 사이트의 검정(--color-ink), 잠금 상자는 주황(--color-orange)을 씀.
+    color: cssColor('--color-ink'),
+    lockColor: cssColor('--color-orange'),
+    // 1px 선을 45% 불투명도로 그려 지도를 가리지 않게 함.
+    thickness: 1,
+    opacity: 0.45,
+    // 교차점 둘레 10px을 비워 마우스 아래 지점이 선에 가리지 않게 함.
+    gap: 10,
+    // 0.2는 약하게 따라오는 정도임. 손떨림은 줄이되 늦게 따라온다는 느낌이 들지 않을 만큼만 부드럽게 함.
+    smoothing: 0.2,
+    // 핀 머리(.map-pin-head)에 마우스가 올라가면 잠금 상자를 그림. 상자는 머리 span(둥근 머리 부분과 같은 정사각형)에 사방 6px 여백을 더한 크기임.
+    // 핀 버튼과 머리 span은 pointer-events: none이고, 눈에 보이는 물방울(머리의 ::before)만 마우스를 받음.
+    // ::before 위에서 일어난 마우스 이벤트는 그 ::before를 가진 머리 span의 이벤트로 처리되므로, 머리를 잠금 대상으로 삼음.
+    targetSelector: '.map-pin-head',
+    // 표시 글자는 위의 mapReadout 함수가 만듦. 함수 이름만 넘기고 호출은 crosshair.js가 함.
+    readout: mapReadout,
+    // 시스템 마우스 커서는 숨기지 않음(map.css의 crosshair·pointer 커서가 그대로 보임).
+    // 운영체제에서 커서를 크게 키운 사용자도 지도 위에서 커서를 잃지 않게 하려는 것임.
+    // 누른 자리에 퍼지는 원을 그림.
+    clickPulse: true,
+    // 직전 조준선의 상태를 이어받음.
+    resume: crosshairResume
+  });
+  // 한 번 이어받은 상태는 다시 쓰지 않도록 비움.
+  crosshairResume = null;
+
+  // stopCrosshair(): 조준선을 지우고, 다음에 만들 조준선이 이어받을 상태를 저장함.
+  function stopCrosshair() {
+    crosshairResume = crosshair.destroy();
+  }
+  // 함수를 실행하지 않고 함수 자체를 반환함.
+  return stopCrosshair;
+}
+
+/*
+ * 펼친 핀의 국가 이름표 배치
+ *
+ * 유럽처럼 가까운 나라가 많으면 map-layout.js가 핀을 빈 자리로 옮겨 펼침(연결선 끝의 점이 실제 위치임).
+ * 그런데 이탈리아 핀이 아프리카 위에 놓이는 식으로 다른 대륙까지 밀리면, 이름 없이는 아프리카 영화로 오해하기 쉬움.
+ * 그래서 옮겨진 핀(펼친 핀)에는 국가 이름표를 항상 보여주고, 이름표가 다른 핀·이름표·실제 위치 점을 가리지 않는 자리를 고름.
+ *
+ * 좌표는 모두 지도(canvas) 왼쪽 위를 (0, 0)으로 하는 px 값임.
+ * position은 arrangeMapPins()가 돌려준 핀 하나의 배치 정보임.
+ *   x: 핀 가운데의 가로 위치, y: 둥근 머리 가운데의 세로 위치, size: 핀 너비(px)임.
+ *   뾰족한 끝은 머리 가운데에서 size × 0.707만큼 아래에 있음(map.css에서 정사각형을 45도 돌린 모양이기 때문임).
+ * 상자(box)는 { left, right, top, bottom } 네 값으로 나타냄.
+ */
+
+// 이름표를 놓아 볼 후보 자리 8곳임. 앞에 있을수록 먼저 고려함(아래 → 오른쪽 → 왼쪽 → 위 → 대각선 네 곳).
+const labelSides = ['below', 'right', 'left', 'above', 'below-right', 'below-left', 'above-right', 'above-left'];
+// 핀과 이름표 사이의 간격(px)임. 너무 멀면 어느 핀의 이름인지 헷갈리므로 붙어 보일 만큼만 띄움.
+const labelGap = 4;
+
+// pinBox(position): 핀 하나가 차지하는 상자를 구함. 둥근 머리 위쪽부터 뾰족한 끝까지이고, 사방으로 2px 여유를 둠.
+function pinBox(position) {
+  return {
+    left: position.x - position.size / 2 - 2,
+    right: position.x + position.size / 2 + 2,
+    top: position.y - position.size / 2 - 2,
+    bottom: position.y + position.size * 0.707 + 2
+  };
+}
+
+/*
+ * labelBox(side, position, width, height): 후보 자리 side에 너비 width, 높이 height인 이름표를 놓았을 때의 상자를 구함.
+ * 기본값은 'below'(뾰족한 끝 아래 가운데)이고, side에 따라 left·top만 바꿈.
+ * 대각선 자리는 둥근 머리의 45도 방향 바깥(가운데에서 size × 0.36 + 간격)에 이름표 모서리를 맞춤.
+ */
+function labelBox(side, position, width, height) {
+  // 둥근 머리의 반지름임.
+  const half = position.size / 2;
+  // 대각선 자리에서 머리 가운데부터 이름표 모서리까지의 가로·세로 거리임.
+  const corner = position.size * 0.36 + labelGap;
+  // 아래(below): 가로는 핀 가운데에 맞추고, 세로는 뾰족한 끝 바로 아래에 둠.
+  let left = position.x - width / 2;
+  let top = position.y + position.size * 0.707 + labelGap;
+  // 위(above): 둥근 머리 위쪽 끝보다 위에 둠.
+  if (side === 'above') {
+    top = position.y - half - labelGap - height;
+  }
+  // 오른쪽·왼쪽: 머리 옆에 두고, 세로 가운데를 머리 가운데에 맞춤.
+  if (side === 'right') {
+    left = position.x + half + labelGap;
+    top = position.y - height / 2;
+  }
+  if (side === 'left') {
+    left = position.x - half - labelGap - width;
+    top = position.y - height / 2;
+  }
+  // 대각선 네 곳은 가로(오른쪽/왼쪽)와 세로(아래/위)를 따로 정함.
+  if (side === 'below-right' || side === 'above-right') {
+    left = position.x + corner;
+  }
+  if (side === 'below-left' || side === 'above-left') {
+    left = position.x - corner - width;
+  }
+  if (side === 'below-right' || side === 'below-left') {
+    top = position.y + corner;
+  }
+  if (side === 'above-right' || side === 'above-left') {
+    top = position.y - corner - height;
+  }
+  return { left: left, right: left + width, top: top, bottom: top + height };
+}
+
+// boxesOverlap(a, b): 두 상자가 조금이라도 겹치면 true임. 가로와 세로 범위가 둘 다 겹쳐야 겹친 것임.
+function boxesOverlap(a, b) {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
+// lineCrossesBox(line, box): 연결선이 상자를 지나가면 true임.
+// 선분 위의 점 21개(양 끝 포함, 1/20 간격)를 차례로 확인하는 간단한 방법을 씀.
+function lineCrossesBox(line, box) {
+  for (let step = 0; step <= 20; step += 1) {
+    const x = line.x1 + (line.x2 - line.x1) * step / 20;
+    const y = line.y1 + (line.y2 - line.y1) * step / 20;
+    if (x > box.left && x < box.right && y > box.top && y < box.bottom) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// distanceToBox(x, y, box): 점 (x, y)에서 상자의 가장 가까운 지점까지의 거리임. 점이 상자 안에 있으면 0임.
+function distanceToBox(x, y, box) {
+  const dx = Math.max(box.left - x, 0, x - box.right);
+  const dy = Math.max(box.top - y, 0, y - box.bottom);
+  return Math.hypot(dx, dy);
+}
+
+/*
+ * labelCost(box, own, positions, width, obstacles, lines): 이름표 상자 box가 얼마나 나쁜 자리인지 점수로 매김. 작을수록 좋음.
+ * own: 이름표 주인 핀, positions: 모든 핀, width: 지도 너비(높이는 그 절반), obstacles: 가리면 안 되는 상자들, lines: 연결선들임.
+ * 점수는 문제의 무게 순서로 크게 차이 나게 줌.
+ *   지도 밖으로 나감 10000 > 다른 핀·이름표·실제 위치 점을 가림 1000(하나마다)
+ *   > 다른 핀이 주인 핀보다 이름표에 더 가까워 헷갈림 100(하나마다) > 연결선 위에 놓임 10(하나마다)
+ */
+function labelCost(box, own, positions, width, obstacles, lines) {
+  const ownDistance = distanceToBox(own.x, own.y, box);
+  let cost = 0;
+  if (box.left < 0 || box.top < 0 || box.right > width || box.bottom > width / 2) {
+    cost += 10000;
+  }
+  for (const other of obstacles) {
+    if (boxesOverlap(box, other)) {
+      cost += 1000;
+    }
+  }
+  for (const other of positions) {
+    if (other !== own && distanceToBox(other.x, other.y, box) < ownDistance) {
+      cost += 100;
+    }
+  }
+  for (const line of lines) {
+    if (lineCrossesBox(line, box)) {
+      cost += 10;
+    }
+  }
+  return cost;
+}
+
+/*
+ * moveLabel(label, side, box, position): 고른 자리로 이름표를 옮김.
+ * 이름표는 핀 버튼 안의 position: absolute 요소이므로, 지도 기준 좌표를 핀 버튼 왼쪽 위 기준 값으로 바꿔 style에 넣음.
+ * 핀 버튼 상자는 둥근 머리와 같은 크기(size × size)이고, 왼쪽 위가 (x - size / 2, y - size / 2)임.
+ */
+function moveLabel(label, side, box, position) {
+  const buttonLeft = position.x - position.size / 2;
+  const buttonTop = position.y - position.size / 2;
+  label.style.top = (box.top - buttonTop) + 'px';
+  // 아래·위 자리는 map.css의 기본 가로 배치(left: 50%, 가운데 맞춤)를 그대로 씀.
+  if (side === 'below' || side === 'above') {
+    return;
+  }
+  // 그 밖의 자리는 가운데 맞춤 이동(transform)을 끄고 가로 위치를 직접 정함.
+  label.style.transform = 'none';
+  // 핀 왼쪽에 놓는 이름표는 오른쪽 끝(right)을 고정함.
+  // 마우스를 올리면 이름표에 ' · 3편'이 붙어 길어지는데, 이때 핀 쪽이 아니라 바깥(왼쪽)으로 늘어나게 하기 위함임.
+  if (side === 'left' || side === 'below-left' || side === 'above-left') {
+    label.style.left = 'auto';
+    label.style.right = (buttonLeft + position.size - box.right) + 'px';
+    return;
+  }
+  label.style.left = (box.left - buttonLeft) + 'px';
+}
+
+// sort()에 넘기는 비교 함수임. 빈 후보 자리가 적은 핀이 앞에 오도록 오름차순으로 정렬함.
+function compareFreeSides(a, b) {
+  return a.freeSides - b.freeSides;
+}
+
+/*
+ * placeLabels(spreadPositions, positions, pinByCode, width, obstacles, lines): 펼친 핀마다 이름표 자리를 정함.
+ * spreadPositions: 옮겨진 핀들, positions: 모든 핀, pinByCode: 국가 코드 → 핀 정보 객체임.
+ * obstacles에는 처음에 모든 핀과 실제 위치 점이 들어 있고, 이름표 자리를 정할 때마다 그 상자를 더함.
+ * 그래서 나중에 정하는 이름표는 먼저 정한 이름표를 피함.
+ */
+function placeLabels(spreadPositions, positions, pinByCode, width, obstacles, lines) {
+  const jobs = [];
+  for (const position of spreadPositions) {
+    const label = pinByCode[position.code].button.querySelector('.map-pin-label');
+    // visibility: hidden 상태여도 크기는 계산되므로 offsetWidth·offsetHeight로 이름표 크기를 읽음.
+    const job = { position: position, label: label, width: label.offsetWidth, height: label.offsetHeight, freeSides: 0 };
+    // 다른 이름표를 놓기 전 상태에서 문제없는(점수 100 미만) 후보 자리가 몇 곳인지 셈.
+    for (const side of labelSides) {
+      if (labelCost(labelBox(side, position, job.width, job.height), position, positions, width, obstacles, lines) < 100) {
+        job.freeSides += 1;
+      }
+    }
+    jobs.push(job);
+  }
+  // 빈 자리가 적어 고르기 어려운 핀부터 자리를 정함. 여유가 많은 핀이 먼저 좋은 자리를 차지해 버리는 일을 줄임.
+  jobs.sort(compareFreeSides);
+
+  for (const job of jobs) {
+    // 8곳 중 점수가 가장 낮은 자리를 고름. 점수가 같으면 labelSides에서 앞선 자리를 그대로 둠.
+    let bestSide = labelSides[0];
+    let bestBox = null;
+    let bestCost = Infinity;
+    for (const side of labelSides) {
+      const box = labelBox(side, job.position, job.width, job.height);
+      const cost = labelCost(box, job.position, positions, width, obstacles, lines);
+      if (cost < bestCost) {
+        bestSide = side;
+        bestBox = box;
+        bestCost = cost;
+      }
+    }
+    moveLabel(job.label, bestSide, bestBox, job.position);
+    // 고른 이름표 상자는 다음 이름표가 피해야 할 장애물이 됨.
+    obstacles.push(bestBox);
+  }
+}
+
+/*
  * moviesByCountry(catalog, logs): 현재 mode에 맞는 국가 코드별 영화 ID 목록을 만듦.
  * catalog: 영화 기본 자료, logs: 현재 프로필의 감상 기록 배열임.
  * 반환값: { 국가 코드: [영화 ID, ...] } 형태의 객체임. 영화가 없는 국가는 항목 자체가 없음.
- * 예: { KR: ['m001', 'm004'], US: ['m001'] }
+ * 예: { KR: ['m001'], GB: ['m003', 'm006'], US: ['m002', 'm006'] }
  * 한 영화가 여러 나라의 공동 제작이면 각 나라의 목록에 모두 들어감.
  * 반환된 배열은 이 파일에서 읽기만 하며 push·sort 등으로 수정하지 않음.
  */
@@ -138,7 +463,8 @@ function compareRanking(a, b) {
 /*
  * renderMap(context): 현재 mode·selectedCode와 기록에 맞게 지도 페이지 본문을 만듦.
  * context는 ui.js의 boot()가 전달하는 객체임. 필요한 항목을 아래에서 하나씩 꺼냄.
- * 별도의 반환값은 없으며 마지막에 app.replaceChildren()으로 화면을 바꿈.
+ * 마지막에 app.replaceChildren()으로 화면을 바꾸고, 지도 조준선을 지우는 함수(startCrosshair의 반환값)를 반환함.
+ * boot()는 다음에 다시 그리기 직전에 이 반환값을 호출해 이전 조준선을 정리함.
  * 최초 실행 때와 refresh()를 호출했을 때 이 함수가 다시 실행되어 페이지 본문 전체를 새로 만듦.
  */
 function renderMap(context) {
@@ -175,13 +501,13 @@ function renderMap(context) {
   // compareRanking 뒤에 ()를 붙이지 않고 함수 자체를 넘기면 sort가 두 항목씩 넣어 호출함.
   ranking.sort(compareRanking);
 
-  // 핀 크기와 순위 막대 길이의 기준이 될 가장 큰 영화 수임.
-  // 국가가 없으면 핀 크기·순위 막대를 계산하는 아래 반복문이 실행되지 않아 이 값은 나눗셈에 쓰이지 않음.
+  // 국가 순위 막대 길이의 기준이 될 가장 큰 영화 수임. 지도 핀은 영화 수와 상관없이 모두 같은 크기라 이 값을 쓰지 않음.
+  // 국가가 없으면 순위 막대를 계산하는 아래 반복문이 실행되지 않아 이 값은 나눗셈에 쓰이지 않음.
   // 그래도 0으로 나누는 계산이 생기지 않도록 안전한 기본값 1로 시작함.
   let maxCount = 1;
   // 정렬 후 첫 번째 항목이 영화 수가 가장 많은 국가임.
   if (ranking.length > 0) {
-    // 1위 국가의 영화 수를 최댓값으로 사용함. 다른 국가는 이 값에 대한 비율로 크기가 정해짐.
+    // 1위 국가의 영화 수를 최댓값으로 사용함. 다른 국가는 이 값에 대한 비율로 막대 길이가 정해짐.
     maxCount = ranking[0].movie_ids.length;
   }
 
@@ -229,7 +555,8 @@ function renderMap(context) {
   // el의 두 번째 인수 {}는 따로 지정할 속성이 없다는 뜻임.
   const pageTitle = el('h1', {}, '영화 지도');
   // p는 페이지 내용을 설명하는 문단이며 muted는 이 문단을 구분하기 위한 클래스임.
-  const description = el('p', { className: 'muted' }, '영화의 제작 국가를 지도 위의 핀으로 보여줍니다. 핀이 클수록 해당 국가의 영화가 많습니다.');
+  // 두 번째 문장은 핀을 누르면 오른쪽(좁은 화면에서는 지도 아래) 국가 영역에 그 국가의 영화 목록이 나타난다는 안내임.
+  const description = el('p', { className: 'muted' }, '영화의 제작 국가를 지도 위의 핀으로 보여줍니다. 핀을 누르면 그 국가의 영화 목록을 볼 수 있습니다.');
   // append(요소1, 요소2)는 부모의 맨 뒤에 자식을 적은 순서대로 추가함.
   // 결과: heading(div) 안에 pageTitle(h1), description(p)이 그 순서로 들어감.
   heading.append(pageTitle, description);
@@ -311,8 +638,9 @@ function renderMap(context) {
     id: 'map-mode-watched',
     // 이 버튼은 폼을 제출하지 않고 아래에 등록한 모드 전환만 실행함.
     type: 'button',
-    // button과 secondary라는 클래스 두 개를 붙임. 클릭 동작은 클래스가 아니라 이벤트가 정함.
-    className: 'button secondary'
+    // btn과 btn-link는 Bootstrap의 글자 버튼 모양 클래스임. 클릭 동작은 클래스가 아니라 이벤트가 정함.
+    // 아래에서 aria-pressed를 붙이므로 common.css가 탭처럼(선택 시 굵은 글자 + 주황 밑줄 막대) 보여줌.
+    className: 'btn btn-link'
   }, '감상한 영화');
   // 전체 영화 기준으로 바꿀 button 요소를 별도로 만듦. watchedButton과는 다른 DOM 객체임.
   const allButton = el('button', {
@@ -321,11 +649,12 @@ function renderMap(context) {
     // 폼을 제출하지 않는 일반 버튼임.
     type: 'button',
     // '감상한 영화' 버튼과 같은 CSS 클래스들을 적용함.
-    className: 'button secondary'
+    className: 'btn btn-link'
   }, '등록된 전체 영화');
   // aria-pressed는 토글 버튼이 눌린(선택된) 상태인지 보조 기술에 알려주는 속성임.
   // String(mode === 'watched')는 비교 결과 true/false를 문자열 'true'/'false'로 바꿈.
-  // map.css는 [aria-pressed="true"]인 모드 버튼의 테두리를 두껍게, 글자를 굵게 표시함.
+  // common.css의 '.btn-link[aria-pressed="true"]' 규칙이 이 값을 보고 선택된 모드 버튼만 굵은 글자 + 주황 밑줄 막대로 표시함.
+  // 모드 버튼의 선택 모양은 map.css가 아니라 common.css가 담당함.
   watchedButton.setAttribute('aria-pressed', String(mode === 'watched'));
   // 두 버튼 중 현재 모드에 해당하는 버튼 하나만 'true'가 됨.
   allButton.setAttribute('aria-pressed', String(mode === 'all'));
@@ -360,24 +689,26 @@ function renderMap(context) {
   // 핀이 이미지 위에 겹쳐 보이는 것은 map.css가 핀에 position: absolute를 지정했기 때문이며 DOM 순서 때문이 아님.
   canvas.append(mapImage);
 
+  // 연결선을 그릴 SVG의 이름공간 주소임. SVG 요소는 createElement가 아니라 createElementNS로 만들어야 함.
   const svgNamespace = 'http://www.w3.org/2000/svg';
+  // 핀을 옮겼을 때 실제 국가 위치와 핀을 잇는 선을 담는 svg임. 보조 기술에는 읽히지 않게 숨김.
   const connections = document.createElementNS(svgNamespace, 'svg');
   connections.setAttribute('class', 'map-connections');
   connections.setAttribute('aria-hidden', 'true');
   canvas.append(connections);
+  // pins는 map-layout.js에 넘길 핀 정보 배열임. pinByCode는 같은 정보를 국가 코드로 바로 찾기 위한 객체임.
   const pins = [];
+  const pinByCode = {};
 
   // 순위에 들어간 국가마다 핀 버튼 하나를 만듦.
   for (const entry of ranking) {
     // 이번 항목의 국가 객체임. 예: { country_code: 'KR', name: '대한민국', pin_lat: 36.3, pin_lng: 127.8 }.
     const country = entry.country;
-    // 이 국가의 영화 수임. 핀 안의 숫자와 핀 크기에 사용함.
+    // 이 국가의 영화 수임. 보조 기술용 이름(aria-label)과 핀 아래 이름표 글자에만 사용함.
+    // 핀 자체에는 숫자를 쓰지 않고, 핀 크기도 영화 수와 상관없이 map.css가 정한 한 가지 크기로 같음.
     const count = entry.movie_ids.length;
     // catalog의 핀 좌표를 지도 위의 % 위치로 바꿈.
     const position = toMapPosition(country.pin_lat, country.pin_lng);
-    // 핀 크기(px)는 26에 0~18을 더한 값이라 26~44px 사이가 됨. 1위 국가의 핀이 44px로 가장 큼.
-    // Math.round는 가장 가까운 정수로 반올림함. 예: 최대 10편 중 5편이면 26 + 9 = 35.
-    const size = 26 + Math.round(18 * count / maxCount);
     // 국가마다 다른 id임. 예: 'map-pin-KR'. 갱신 뒤 같은 핀으로 초점을 돌려놓을 때 사용함.
     const pinId = 'map-pin-' + country.country_code;
 
@@ -387,12 +718,11 @@ function renderMap(context) {
       id: pinId,
       // 폼을 제출하지 않는 일반 버튼임.
       type: 'button',
-      // map.css의 '.map-canvas .map-pin' 규칙이 공통 버튼의 테두리·여백·최소 크기를 지워 --size 크기의 투명한 상자로 만듦.
+      // map.css의 '.map-canvas .map-pin' 규칙이 공통 버튼의 테두리·여백·최소 크기를 지워 --map-pin-size 크기의 투명한 상자로 만듦.
       // 눈에 보이는 핀 모양은 안쪽의 map-pin-head가 그림.
       className: 'map-pin',
-
-      ariaLabel: `${country.name}, 영화 ${count}편`,
-      title: `${country.name} · ${count}편`
+      // 핀에는 글자가 없으므로 국가 이름과 영화 수를 한 문장으로 보조 기술에 알려줌.
+      ariaLabel: `${country.name}, 영화 ${count}편`
     });
     // style.left는 요소에 직접 넣는 인라인 스타일임. 숫자 뒤에 '%'를 붙여 '85.5%' 같은 CSS 값을 만듦.
     // map.css의 position: absolute와 함께 canvas 왼쪽 끝에서의 거리를 정함.
@@ -401,29 +731,29 @@ function renderMap(context) {
     // left/top은 상자의 왼쪽 위 모서리를 이 좌표에 놓음. 뾰족한 끝을 좌표에 맞추는 일은 map.css가 담당함.
     // map.css의 translate(-50%, -120.7%)가 상자를 너비의 절반만큼 왼쪽, 높이의 120.7%만큼 위로 옮김.
     pin.style.top = position.top + '%';
-    // setProperty('--size', 값)는 CSS 사용자 정의 속성(변수)을 이 요소에만 지정함.
-    // --로 시작하는 사용자 정의 속성은 style.backgroundColor 같은 전용 속성 이름이 없음.
-    // style.size나 style['--size']로 대입해도 CSS에 반영되지 않으므로 setProperty를 사용함.
-    // map.css가 width: var(--size), height: var(--size)로 이 값을 읽어 핀마다 다른 크기를 적용함.
-    pin.style.setProperty('--size', size + 'px');
 
-    // pinHead는 물방울 모양 핀 머리임. map.css가 정사각형을 -45도 돌려 뾰족한 모서리가 아래를 향하게 함.
+    // pinHead는 핀 머리임. 안에 글자나 자식 요소 없이 빈 span으로 둠.
+    // 물방울 모양과 가운데의 둥근 점은 map.css가 ::before로 그림. 정사각형을 -45도 돌려 뾰족한 모서리가 아래를 향하게 함.
     const pinHead = el('span', { className: 'map-pin-head' });
-    // 핀 머리 안에 표시할 영화 수 숫자임. String(count)로 숫자를 글자로 바꿔 넣음.
-    // 부모가 -45도 돌아가 있으므로 map.css가 이 span을 +45도 되돌려 숫자가 똑바로 보이게 함.
-    const pinCount = el('span', { className: 'map-pin-count' }, String(count));
-    // 결과: pinHead(span) → pinCount(span).
-    pinHead.append(pinCount);
-
-    pin.append(pinHead);
-    pins.push({ code: country.country_code, left: position.left, top: position.top, size, button: pin });
+    // 핀 아래에 뜨는 이름표임. 예: '대한민국 · 3편'.
+    // map.css가 평소에는 숨기고 마우스를 올렸을 때·키보드 초점·선택 상태에서만 보여줌.
+    // 펼친 핀(옮겨진 핀)은 이름표를 항상 보여주되, 평소에는 국가 이름만 보이도록 ' · 3편' 부분을 따로 span에 넣음.
+    // 이름표 전체 글자(textContent)는 그대로 '대한민국 · 3편'이므로 조준선 안내 글자(mapReadout)도 바뀌지 않음.
+    const pinCount = el('span', { className: 'map-pin-count' }, ` · ${count}편`);
+    const pinLabel = el('span', { className: 'map-pin-label' }, country.name, pinCount);
+    // 결과: pin(button) → [pinHead(span), pinLabel(span)].
+    pin.append(pinHead, pinLabel);
+    // 겹침 계산에 쓸 핀 정보임. size는 화면에 붙인 뒤 positionPins()가 실제 핀 너비로 채움.
+    const pinInfo = { code: country.country_code, left: position.left, top: position.top, size: 0, button: pin };
+    pins.push(pinInfo);
+    pinByCode[country.country_code] = pinInfo;
 
     // 이번 국가가 선택된 국가인지 확인해 선택 상태를 표시함.
     if (country.country_code === selectedCode) {
       // classList.add는 기존 클래스를 지우지 않고 클래스 이름 하나를 추가함.
       // selected는 선택한 핀을 구분하는 클래스임. 현재 map.css의 강조는 aria-pressed="true"를 기준으로 함.
       pin.classList.add('selected');
-      // 선택 상태를 CSS와 보조 기술에 모두 전달함. map.css는 이 핀 머리의 테두리를 두껍게, 크기를 조금 크게 함. 국가 이름은 지도 아래 선택 문구와 버튼 title로 확인함.
+      // 선택 상태를 CSS와 보조 기술에 모두 전달함. map.css는 이 핀 머리를 검게 칠하고 가운데 점을 주황으로 바꾸며, 크기를 조금 크게 하고 이름표를 보여줌.
       pin.setAttribute('aria-pressed', 'true');
     } else {
       // 선택하지 않은 나머지 핀도 상태를 명시하여 '선택 안 됨'으로 표시함.
@@ -440,7 +770,7 @@ function renderMap(context) {
     pin.addEventListener('click', selectPin);
     // 완성한 핀을 canvas에 붙임. position: absolute인 핀은 순서와 상관없이 위치 지정이 없는 지도 이미지보다 위에 그려짐.
     // 핀끼리 겹치면 나중에 붙인 핀(순위가 낮은 국가)이 위에 옴.
-    // 마우스를 올린 핀·키보드 초점을 받은 핀·선택된 핀은 map.css의 z-index: 1로 맨 위에 옴.
+    // 마우스를 올린 핀·키보드 초점을 받은 핀·선택된 핀은 map.css의 z-index: 2로 다른 핀(z-index 1)보다 위에 옴.
     canvas.append(pin);
   }
 
@@ -448,20 +778,46 @@ function renderMap(context) {
   // 지도 영역이 너무 좁으면 지도 자체를 넓히고 해당 영역만 가로 스크롤하도록 함.
   function positionPins() {
     let width = Math.max(560, viewport.getBoundingClientRect().width);
+    // 핀 크기는 map.css의 --map-pin-size(30px, 좁은 화면 24px)를 따르므로 화면에 그려진 너비를 그대로 읽음.
+    for (const pin of pins) {
+      pin.size = pin.button.offsetWidth;
+    }
     let positions = arrangeMapPins(pins, width, width / 2);
     while (positions === null) {
       width += 80;
       positions = arrangeMapPins(pins, width, width / 2);
     }
     canvas.style.width = width + 'px';
-    connections.setAttribute('viewBox', `0 0 ${width} ${width / 2}`);
+    connections.setAttribute('viewBox', '0 0 ' + width + ' ' + width / 2);
     connections.replaceChildren();
+    // 이름표 자리를 정할 때 쓸 목록임. obstacles: 가리면 안 되는 상자, lines: 연결선, spreadPositions: 옮겨진 핀.
+    const obstacles = [];
+    const lines = [];
+    const spreadPositions = [];
     for (const position of positions) {
-      const pin = pins.find(item => item.code === position.code);
+      const pin = pinByCode[position.code];
       const tipY = position.y + position.size * 0.707;
       pin.button.style.left = position.x + 'px';
       pin.button.style.top = tipY + 'px';
-      if (Math.hypot(position.x - position.anchorX, tipY - position.anchorY) < 1) continue;
+      // 화면 폭이 바뀌어 다시 배치할 때를 위해, 지난번에 붙인 펼침 표시와 이름표 위치(style)를 먼저 지움.
+      const label = pin.button.querySelector('.map-pin-label');
+      pin.button.classList.remove('map-pin-spread');
+      label.removeAttribute('style');
+      obstacles.push(pinBox(position));
+      // 거의 옮기지 않은 핀(1px 미만)은 연결선을 그리지 않음.
+      // 다만 선택된 핀은 아래에 이름표가 항상 보이므로, 다른 이름표가 그 자리를 가리지 않도록 장애물에 넣음.
+      if (Math.hypot(position.x - position.anchorX, tipY - position.anchorY) < 1) {
+        if (position.code === selectedCode) {
+          obstacles.push(labelBox('below', position, label.offsetWidth, label.offsetHeight));
+        }
+        continue;
+      }
+      // 옮겨진 핀에는 map-pin-spread를 붙여 map.css가 이름표를 항상 보여주게 함.
+      pin.button.classList.add('map-pin-spread');
+      spreadPositions.push(position);
+      lines.push({ x1: position.anchorX, y1: position.anchorY, x2: position.x, y2: tipY });
+      // 실제 위치 점(반지름 3px)도 이름표가 가리지 않도록 가로·세로 10px 상자로 장애물에 넣음.
+      obstacles.push({ left: position.anchorX - 5, right: position.anchorX + 5, top: position.anchorY - 5, bottom: position.anchorY + 5 });
       const line = document.createElementNS(svgNamespace, 'line');
       line.setAttribute('x1', position.anchorX);
       line.setAttribute('y1', position.anchorY);
@@ -470,20 +826,33 @@ function renderMap(context) {
       const dot = document.createElementNS(svgNamespace, 'circle');
       dot.setAttribute('cx', position.anchorX);
       dot.setAttribute('cy', position.anchorY);
-      dot.setAttribute('r', '2.5');
+      // 실제 위치 점의 반지름임. map.css가 흰 테두리를 둘러 회색 육지 위에서도 보이게 함.
+      dot.setAttribute('r', '3');
       if (position.code === selectedCode) {
         line.classList.add('selected');
         dot.classList.add('selected');
       }
       connections.append(line, dot);
     }
+    // 모든 핀과 연결선 자리가 정해진 뒤에 펼친 핀의 이름표 자리를 정함.
+    placeLabels(spreadPositions, positions, pinByCode, width, obstacles, lines);
   }
-  // 화면 폭이 바뀔 때 다시 배치하며, boot의 화면 정리 함수에서 관찰을 해제함.
-  function observeMap() {
+  // 핀을 배치하고, 화면 폭이 바뀔 때 다시 배치하며, 조준선도 켬.
+  // boot는 다음 그리기 전에 반환한 정리 함수를 부르므로, 관찰 해제와 조준선 정리를 한 함수로 묶음.
+  function startMapEffects() {
     positionPins();
     const observer = new ResizeObserver(positionPins);
     observer.observe(viewport);
-    return () => observer.disconnect();
+    const stopCrosshair = startCrosshair(canvas);
+
+    function stopMapEffects() {
+      observer.disconnect();
+      // 터치 화면에서는 조준선을 만들지 않아 stopCrosshair가 undefined임.
+      if (stopCrosshair !== undefined) {
+        stopCrosshair();
+      }
+    }
+    return stopMapEffects;
   }
   const viewport = el('div', { className: 'map-viewport', tabIndex: 0, role: 'region', ariaLabel: '세계 지도. 좁은 화면에서는 좌우로 스크롤할 수 있습니다.' });
   viewport.append(canvas);
@@ -493,22 +862,20 @@ function renderMap(context) {
   // 지도 영역의 소제목 h2임.
   const mapTitle = el('h2', {}, '세계 지도');
 
-  const mapHelp = el('p', { className: 'map-help' }, '가까운 핀은 펼쳐서 표시합니다. 연결선 끝의 점이 실제 국가 위치입니다. 지도가 잘리면 좌우로 스크롤하세요.');
+  // 지도 아래 안내 문장임. 펼친 핀에는 국가 이름이 함께 보인다는 점과 연결선 끝의 점이 실제 위치라는 점을 알려 줌.
+  const mapHelp = el('p', { className: 'map-help' }, '가까운 핀은 펼쳐서 국가 이름과 함께 표시합니다. 연결선 끝의 점이 실제 국가 위치입니다. 지도가 잘리면 좌우로 스크롤하세요.');
   mapPanel.append(mapTitle, toolbar, viewport, mapHelp);
-  if (selectedEntry !== null) {
-    mapPanel.append(el('p', { className: 'map-selection', ariaLive: 'polite' }, `선택한 국가: ${selectedEntry.country.name} · ${selectedEntry.movie_ids.length}편`));
-  }
 
   // 감상한 영화 모드에서 핀이 하나도 없으면(주로 감상 기록이 아직 없을 때) 다음 행동을 안내함.
   if (ranking.length === 0 && mode === 'watched') {
-    // 공통 CSS에서 점선 테두리와 간격을 지정한 empty-state를 적용함.
+    // 공통 CSS에서 옅은 회색 바탕과 간격을 지정한 empty-state를 적용함.
     const empty = el('div', { className: 'empty-state' });
     // 핀이 없는 이유를 설명하는 문단임.
     const emptyMessage = el('p', {}, '아직 감상 기록이 없어 지도에 표시할 핀이 없습니다.');
-    // 메인 페이지로 가는 링크임. button 클래스로 버튼처럼 보이지만 실제로는 a 요소임.
-    const homeLink = el('a', { href: 'index.html', className: 'button' }, '메인 페이지로 이동');
+    // 메인 페이지로 가는 링크임. btn btn-link 클래스로 글자 버튼처럼 보이지만 실제로는 a 요소임.
+    const homeLink = el('a', { href: 'index.html', className: 'btn btn-link' }, '메인 페이지로 이동');
     // 기록이 없어도 지도를 사용해 볼 수 있도록 전체 영화 모드로 바꾸는 버튼임.
-    const allMoviesButton = el('button', { type: 'button', className: 'button secondary' }, '등록된 전체 영화로 보기');
+    const allMoviesButton = el('button', { type: 'button', className: 'btn btn-link' }, '등록된 전체 영화로 보기');
     // 위의 '등록된 전체 영화' 버튼과 같은 showAll을 연결함. 갱신 뒤 초점은 'map-mode-all' 버튼으로 감.
     allMoviesButton.addEventListener('click', showAll);
     // 결과: empty(div) → [emptyMessage(p), homeLink(a), allMoviesButton(button)].
@@ -533,8 +900,10 @@ function renderMap(context) {
     layout.classList.add('single');
     // 제목과 지도 영역만으로 본문을 교체함.
     app.replaceChildren(heading, layout);
-
-    return observeMap();
+    // return으로 renderMap을 여기서 끝냄. 아래의 국가별 영화 목록과 순위는 만들지 않음.
+    // 지도는 화면에 있으므로 조준선은 만들고, 조준선을 지우는 함수를 반환함.
+    // 화면에 붙인 뒤에 만들어야 지도 크기와 마우스 위치를 바로 잴 수 있음.
+    return startMapEffects();
   }
 
   // 선택한 국가의 영화 목록을 담을 section임.
@@ -564,7 +933,7 @@ function renderMap(context) {
     let posterUrl = 'assets/posters/placeholder.jpg';
     // poster_url이 null이 아니면 영화에 등록된 포스터 경로를 사용함.
     if (movie.poster_url !== null) {
-      // 예: 'assets/posters/m001.jpg'.
+      // 예: 'https://image.tmdb.org/t/p/w500/jjHccoFjbqlfr4VGLVLT7yek0Xn.jpg'.
       posterUrl = movie.poster_url;
     }
     // 개봉일이 없을 때 보여줄 기본 문구임.
@@ -624,8 +993,8 @@ function renderMap(context) {
     // 순위 버튼의 국가별 id임. 예: 'map-rank-KR'. 핀의 id와 겹치지 않도록 앞부분을 다르게 함.
     const rankId = 'map-rank-' + country.country_code;
 
-    // 클래스 없이 만든 일반 버튼임. 기본 테두리·여백은 common.css의 button 규칙이 정함.
-    // 가로 배치·전체 너비·회색 테두리는 map.css의 '.map-rank-list button' 규칙이 정함.
+    // 클래스 없이 만든 일반 버튼임. 모양은 map.css의 '.map-rank-list button' 규칙이 정함.
+    // 이 규칙은 브라우저 기본 테두리를 지우고 여백을 새로 정한 뒤, 전체 너비의 가로 배치, 아래쪽 연회색 구분선, 투명한 왼쪽 4px 테두리를 지정함.
     const rankButton = el('button', { id: rankId, type: 'button' });
     // 국가 이름을 담는 span임.
     const rankName = el('span', { className: 'map-rank-name' }, country.name);
@@ -642,7 +1011,7 @@ function renderMap(context) {
     if (country.country_code === selectedCode) {
       // selected 클래스를 추가함. map.css의 강조는 아래 aria-pressed 값을 기준으로 함.
       rankButton.classList.add('selected');
-      // map.css가 이 버튼의 테두리를 연한 회색에서 글자색으로 바꾸고 글자를 굵게 표시함.
+      // map.css가 이 버튼의 투명한 왼쪽 4px 테두리를 글자색(--color-ink)으로 칠하고, 연회색 바탕과 굵은 글자로 표시함.
       rankButton.setAttribute('aria-pressed', 'true');
     } else {
       // 선택하지 않은 순위 버튼도 상태를 명시하여 '선택 안 됨'으로 표시함.
@@ -677,8 +1046,8 @@ function renderMap(context) {
   // replaceChildren은 app 자체는 유지하고 기존 본문 자식만 새 요소들로 교체함.
   // 로딩 표시 또는 이전 지도 화면이 사라지고 새 화면이 나타남. DB의 기록은 삭제하지 않음.
   app.replaceChildren(heading, layout);
-
-  return observeMap();
+  // 새 지도가 화면에 붙은 뒤 조준선을 만들고, 조준선을 지우는 함수를 boot()에 반환함.
+  return startMapEffects();
 }
 
 // 준비 함수에 화면을 그릴 함수의 이름을 전달함. renderMap()으로 즉시 호출하지 않음.

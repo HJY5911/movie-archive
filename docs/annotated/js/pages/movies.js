@@ -20,7 +20,7 @@ import { boot, movieCard, showMessage } from '../ui.js';
 import { searchMovies } from '../selectors.js';
 
 // location.search는 현재 URL에서 ?부터 시작하는 검색 매개변수 부분임.
-// 예: movies.html?q=달우1에서 q의 값을 쉽게 읽도록 URLSearchParams 객체로 감쌈.
+// 예: movies.html?q=검색어에서 q의 값을 쉽게 읽도록 URLSearchParams 객체로 감쌈.
 const urlParams = new URLSearchParams(location.search);
 // get('q')는 q 항목의 값을 문자열로 반환함. q가 없으면 null을 반환함.
 // 검색할 때마다 값이 바뀌므로 재대입이 가능한 let을 사용함.
@@ -85,18 +85,21 @@ function renderMovies(context) {
   input.type = 'search';
   // name은 폼 데이터 항목의 이름임. 이 프로젝트는 검색어 이름으로 q를 사용함.
   input.name = 'q';
+  // form-control은 Bootstrap의 입력칸 모양 클래스임. 메인 검색창과 같은 모양이 됨.
+  input.className = 'form-control';
   // 현재 검색어를 입력칸에 넣음. URL로 들어온 검색어도 여기서 화면에 나타남.
   input.value = query;
-  // placeholder는 입력이 비어 있을 때만 보이는 예시임. '달우1'은 현재 자료에 있는 영화 별칭임.
-  input.placeholder = '예: 달우1';
+  // placeholder는 입력이 비어 있을 때만 흐리게 보이는 안내 문구임.
+  // 특정 영화 이름을 예로 들면 영화 자료(data/catalog.json)를 바꿀 때 함께 고쳐야 하므로, 무엇으로 찾을 수 있는지만 적음.
+  input.placeholder = '제목, 별칭, 배우 또는 감독 이름';
   // 보조 기술에도 검색 가능한 정보의 종류를 알려줌. 실제 검색 범위를 바꾸는 속성은 아님.
   input.setAttribute('aria-label', '영화 제목, 별칭, 배우 또는 감독');
   // button 요소를 만들어 검색을 실행할 제출 버튼으로 사용함.
   const submit = document.createElement('button');
   // submit 버튼을 누르거나 입력칸에서 Enter를 누르면 form의 submit 이벤트가 발생함.
   submit.type = 'submit';
-  // 공통 버튼 CSS를 선택할 수 있게 클래스 이름을 붙임.
-  submit.className = 'button';
+  // btn btn-primary는 Bootstrap의 채워진 주요 버튼 모양임. 이 사이트에서는 주황 바탕임.
+  submit.className = 'btn btn-primary';
   // 버튼 안에 보이는 문구임.
   submit.textContent = '검색';
   // label을 form의 첫 자식으로 넣어 입력 설명이 먼저 나타나도록 함.
@@ -177,7 +180,7 @@ function renderMovies(context) {
   if (results.length === 0) {
     // 비어 있는 결과 안내를 담을 바깥 div임.
     const empty = document.createElement('div');
-    // 공통 CSS에서 점선 테두리와 간격을 지정한 empty-state를 적용함.
+    // 공통 CSS에서 옅은 회색 바탕과 간격을 지정한 empty-state를 적용함.
     empty.className = 'empty-state';
     // h2는 결과 없음 안내의 소제목임.
     const emptyTitle = document.createElement('h2');

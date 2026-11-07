@@ -33,6 +33,16 @@ common.css                   : 공통 글꼴·여백·화면 배치·버튼과 �
 
 catalog.json : 영화 제목, 개봉일, 상영 시간, 포스터 경로, 줄거리와 장르·제작 국가·인물·검색 별칭·시리즈 등의 정보를 담은 JSON 파일
 
+catalog.json은 시연용 목데이터임: 실제 영화 18편의 공개 정보(제목·개봉일·상영 시간·장르·제작 국가·감독·주요 출연)를 KOBIS·위키백과·TMDB에서 확인해 넣었고, 줄거리는 직접 짧게 요약함
+
+포스터 이미지: TMDB(themoviedb.org) 이미지 주소를 그대로 연결함 (저장소에 내려받지 않음, 화면에 보이려면 인터넷 연결 필요). 모든 페이지 바닥글에 TMDB 출처와 "TMDB의 승인·인증을 받지 않음" 문구를 표시함
+
+DB 연결 시: 영화 기본 정보는 data/catalog.json 파일과 이를 읽는 repository.js의 loadCatalog()만 바꾸면 됨 (같은 표·속성 이름으로 돌려주는 경우). 페이지 코드에는 특정 영화 제목·ID를 적어 두지 않았고, 검색창 안내 문구도 영화와 무관한 문구를 사용함
+
+외부 코드: 로고 입자·첫 화면·지도 조준선 효과는 React Bits(MIT + Commons Clause), 모든 페이지의 배경 점 격자는 21st.dev의 Sonar Grid(MIT)를 옮겨 쓴 것으로, 출처와 라이선스 원문은 THIRD_PARTY_NOTICES.md에 있음
+
+외부 자원: 화면 틀은 Bootstrap 5.3.3 CSS(MIT), 글꼴은 Pretendard·Anton(SIL OFL 1.1)을 CDN 주소로 불러옴 (저장소에 포함하지 않음, 목록은 THIRD_PARTY_NOTICES.md 맨 아래)
+
 영화 기본 정보는 catalog.json에서 불러오고, 사용자 프로필·감상 기록·사진은 브라우저의 IndexedDB에 저장
 
 

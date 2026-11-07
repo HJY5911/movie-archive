@@ -27,11 +27,28 @@
   -->
   <title>[프로젝트 제목]</title> <!-- 탭 제목 -->
   <!--
+    브라우저 탭에 표시할 작은 아이콘(favicon)임. 다른 페이지와 같은 assets/favicon.jpg를 씀.
+    이 줄이 없으면 브라우저가 /favicon.ico를 따로 찾다가 404 오류를 콘솔에 남김.
+  -->
+  <link rel="icon" type="image/jpeg" href="assets/favicon.jpg">
+  <!--
     외부 CSS 파일을 이 HTML에 연결함. rel="stylesheet"는 스타일시트라는 뜻임.
     href="css/common.css"는 현재 HTML 파일 위치를 기준으로 css 폴더의 common.css를 가리킴.
     CSS가 요소를 선택할 때 사용하는 id·class 이름은 HTML 또는 JS에서 만들어진 요소에 붙어 있음.
   -->
   <link rel="stylesheet" href="css/common.css">
+  <!--
+    첫 화면(영화 카메라 뷰파인더 소개 화면) 전용 스타일임.
+    클래스 이름이 모두 intro-로 시작하므로 common.css의 다른 스타일과 겹치지 않음.
+  -->
+  <link rel="stylesheet" href="css/intro.css">
+  <!--
+    첫 화면을 만드는 모듈임. 아래 index.js보다 먼저 실행되어 #sidebar 바로 앞에 소개 화면을 끼워 넣음.
+    주소를 직접 입력하거나 다른 사이트에서 들어오거나 새로고침하면 소개 화면이 보임.
+    이 사이트 안의 메뉴·로고를 눌러 들어오면 소개 화면을 넣지 않고 바로 메인 화면을 보여줌.
+    이 파일이 실패해도 index.js는 따로 실행되므로 메인 화면은 그대로 동작함.
+  -->
+  <script type="module" src="js/intro.js"></script>
   <!--
     이 페이지에서 실행할 JavaScript 파일을 연결함. src는 현재 HTML 위치 기준 파일 경로임.
     type="module"은 import/export를 사용할 수 있는 모듈로 읽으라는 뜻임.
@@ -106,7 +123,7 @@
     role="status"는 상태 안내임을, aria-live="polite"는 내용 변경을 보조 기술이 적절한 시점에 알리도록 지정함.
     메시지 문자열은 JS에서 textContent로 넣으며, 일정 시간이 지나면 다시 숨김.
   -->
-  <div id="messages" role="status" aria-live="polite" hidden></div>  
+  <div id="messages" role="status" aria-live="polite" hidden></div>
 <!--
   화면 내용을 담는 body를 닫음.
 -->

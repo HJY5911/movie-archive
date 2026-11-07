@@ -4,13 +4,14 @@
  * 이 파일은 HTML 요소를 만들고 메뉴·메시지·초기 실행 흐름을 연결함.
  * 실제 색상, 글자 크기, 간격 등은 CSS에서 정함. className을 붙이는 것만으로
  * 색상이 생기지는 않음. 해당 클래스를 사용하는 CSS 규칙이 있어야 함.
- * 현재 버전에서는 디자인 합의 전에도 기능을 확인할 수 있도록 장식을 뺐음.
+ * navbar, nav-link, card, btn, badge, visually-hidden 같은 이름은 Bootstrap 5.3.3 클래스임.
+ * Bootstrap CSS는 common.css 맨 위에서 불러오며, Bootstrap JS는 쓰지 않음.
  *
  * 읽는 순서:
  * 1. el(): HTML 요소를 만드는 공통 도구
  * 2. showMessage(): 저장 성공·실패 등의 안내
  * 3. movieCard(): 영화 정보와 상세 페이지 링크
- * 4. mountShell(): 모든 페이지에 공통 메뉴 설치
+ * 4. mountShell(): 모든 페이지에 공통 메뉴와 배경 점 격자 설치, 바닥글에 자료 출처(TMDB) 추가
  * 5. boot(): 데이터 준비 → 기록 읽기 → 각 페이지의 render() 호출
  *
  * export가 붙은 함수는 다른 파일에서 import하여 사용할 수 있음.
@@ -25,6 +26,12 @@
 // 이 import 선언 자체가 위 세 함수를 호출하지는 않음. 세 함수의 작업은 호출할 때 시작함.
 // 다만 가져온 모듈의 최상위 코드는 모듈을 불러와 평가하는 과정에서 실행됨.
 import { loadCatalog, openRepository, readSnapshot } from './repository.js';
+// createParticleText(): 글자를 입자(작은 점)로 그리는 효과임. 위쪽 메뉴의 FILMLOG 로고에 씀.
+// React Bits의 ParticleText를 순수 JavaScript로 옮긴 파일이며 설명은 docs/annotated/js/effects/particle-text.js에 있음.
+import { createParticleText } from './effects/particle-text.js';
+// createSonarGrid(): 모든 페이지 배경에 옅은 점 격자를 깔고 둥근 파동이 퍼지게 그리는 효과임.
+// 21st.dev의 Sonar Grid(MIT)를 순수 JavaScript로 옮긴 파일이며 설명은 docs/annotated/js/effects/sonar-grid.js에 있음.
+import { createSonarGrid } from './effects/sonar-grid.js';
 
 /*
  * el(tag, attrs, ...children)
@@ -143,8 +150,16 @@ export function showMessage(text, type = 'success') {
  * movie: 표시할 영화 한 편의 객체임.
  * 세 번째 인수 { watched = false } = {}는 옵션 객체에서 watched를 꺼내는 구조 분해임.
  * 옵션 객체를 생략해도 {}, watched를 생략해도 false를 사용하므로 호출하기 편함.
- * 반환값: 영화 제목, 기본 정보, 상세 링크를 넣은 article 요소임.
- * 현재는 포스터와 색상 장식을 생성하지 않음. 상세 화면의 입력·저장은 pages/movie.js에서 처리함.
+ * 반환값: 포스터·제목·개봉 연도·상영 시간·장르를 담은 포스터 카드(article 요소)임.
+ * 만들어지는 구조:
+ *   article.movie-card.card
+ *     img.movie-card-poster (2:3 포스터)
+ *     div.card-body
+ *       h3.card-title > a.stretched-link (제목, 상세 페이지 링크)
+ *       p.movie-card-meta (예: 2019 · 132분)
+ *       p.movie-card-genres (예: 드라마 · 스릴러, 장르가 있을 때만)
+ *       p.movie-card-watched.badge ('감상한 영화', watched가 참일 때만)
+ * 상세 화면의 입력·저장은 pages/movie.js에서 처리함.
  * 아래에서는 el()에 요소를 중첩해 전달하는 대신 기본 DOM 명령을 한 단계씩 사용함.
  * 요소를 만들기 → 속성과 글자를 넣기 → 부모 요소에 붙이기 순서로 읽으면 됨.
  */
@@ -160,50 +175,78 @@ export function movieCard(catalog, movie, { watched = false } = {}) {
     .map(row => catalog.lookup.genreById.get(row.genre_id).name);
 
   // document.createElement(태그 이름)는 브라우저의 기본 기능으로 새 HTML 요소를 만듦.
-  // article은 영화 한 편의 제목과 정보를 묶는 바깥 요소임. 아직 실제 문서에는 붙지 않았음.
+  // article은 영화 한 편의 포스터와 정보를 묶는 바깥 요소임. 아직 실제 문서에는 붙지 않았음.
   const card = document.createElement('article');
-  // className은 HTML의 class 속성에 해당함. 기존 이름을 유지해 같은 CSS를 적용받게 함.
-  card.className = 'movie-card';
+  // movie-card는 이 프로젝트의 카드 모양, card는 Bootstrap 카드 클래스임.
+  // card는 position: relative를 가지므로 아래 stretched-link가 카드 전체로 넓어질 수 있음.
+  card.className = 'movie-card card';
+
+  // 포스터 이미지임. 제목이 바로 아래 글자로 나오므로 alt는 빈 문자열(장식 이미지)로 둠.
+  // 이렇게 하면 화면 읽기 프로그램이 제목을 두 번 읽지 않음.
+  const poster = document.createElement('img');
+  // card-img-top은 Bootstrap 카드 위쪽 이미지 클래스이며 너비를 카드에 맞춤.
+  poster.className = 'movie-card-poster card-img-top';
+  // poster_url이 null이나 빈 문자열이면 ||의 오른쪽인 기본 포스터 그림을 씀.
+  poster.src = movie.poster_url || 'assets/posters/placeholder.jpg';
+  poster.alt = '';
+  // lazy는 이미지가 화면 가까이 올 때 내려받게 하는 브라우저 기능임.
+  poster.loading = 'lazy';
+  card.appendChild(poster);
+
+  // card-body는 Bootstrap 카드의 글자 영역임. 제목과 정보 문단을 이 안에 넣음.
+  const body = document.createElement('div');
+  body.className = 'card-body';
+  card.appendChild(body);
 
   // h3는 영화 제목을 담을 소제목, a는 제목을 클릭하면 상세 화면으로 이동하게 할 링크임.
-  // heading은 글자가 아니라 HTMLHeadingElement 객체이며, 그 안에 다음 줄의 링크를 넣을 예정임.
   const heading = document.createElement('h3');
-  // link는 아직 주소와 제목이 없는 HTMLAnchorElement 객체임. 바로 아래 href/textContent에서 값을 채움.
+  heading.className = 'card-title';
   const link = document.createElement('a');
+  // stretched-link는 Bootstrap 클래스임. 링크의 누르는 영역을 카드 전체로 넓혀
+  // 포스터를 눌러도 상세 페이지로 이동함. 실제 링크 요소는 제목 하나뿐임.
+  link.className = 'stretched-link';
   // href는 이동할 주소임. ?id=...는 이동할 페이지에 전달하는 검색 매개변수임.
   // encodeURIComponent는 ID의 특수문자가 URL 구조로 잘못 해석되지 않도록 인코딩함.
-  // 이 링크는 상세 페이지 주소를 만드는 것이며, 상세 기능 자체를 구현하는 코드는 아님.
   link.href = `movie.html?id=${encodeURIComponent(movie.movie_id)}`;
   // textContent는 제목을 일반 글자로 넣음. 제목에 '<b>'가 있어도 HTML 태그로 해석하지 않음.
   link.textContent = movie.title;
-  // 부모.appendChild(자식)는 자식 노드 한 개를 부모의 맨 뒤에 붙임.
-  // 먼저 h3 안에 a를 넣고, 그 h3를 article 안에 넣음.
-  // 결과는 <article class="movie-card"><h3><a ...>제목</a></h3></article> 구조임.
-  // 이 줄의 부모는 heading(h3), 자식은 link(a)임. 영화 제목을 누를 수 있는 소제목으로 묶음.
+  // 먼저 h3 안에 a를 넣고, 그 h3를 card-body 안에 넣음.
   heading.appendChild(link);
-  // 이 줄의 부모는 card(article), 자식은 링크가 들어 있는 heading(h3)임. 링크만 따로 두지 않음.
-  card.appendChild(heading);
+  body.appendChild(heading);
 
-  // 개봉 날짜·장르·상영 시간은 한 문단(p)에 넣음. const 변수에 요소를 보관해 순서대로 설정함.
+  // 개봉 연도와 상영 시간을 ' · '로 이은 한 줄임. 예: '2019 · 132분'
   const details = document.createElement('p');
-  // ??는 왼쪽 값이 null 또는 undefined일 때만 오른쪽 값을 사용함.
-  // join(', ')은 장르 배열을 쉼표와 공백으로 이어 붙임. 빈 배열이면 빈 문자열임.
-  // 상영 시간은 null일 때 '미등록', 숫자가 있으면 '120분'처럼 표시함.
-  // 백틱(`...`)은 템플릿 문자열이며 ${표현식} 자리에 계산 결과를 끼워 넣음.
-  // 바깥 템플릿 문자열 안의 ${...}에서 또 다른 템플릿 문자열을 사용할 수 있음.
-  details.textContent = `개봉: ${movie.release_date ?? '미등록'} / 장르: ${genres.join(', ')} / 상영 시간: ${movie.runtime_min === null ? '미등록' : `${movie.runtime_min}분`}`;
-  // 이미 제목이 들어 있는 card의 맨 뒤에 정보 문단을 붙임. 제목은 유지됨.
-  card.appendChild(details);
+  details.className = 'movie-card-meta';
+  // 먼저 기본값 '개봉일 미등록'을 넣어 두고, release_date가 있을 때만 slice(0, 4)로 앞 네 글자(연도)로 바꿈.
+  let yearText = '개봉일 미등록';
+  if (movie.release_date) {
+    yearText = movie.release_date.slice(0, 4);
+  }
+  // 상영 시간도 같은 방식임. null이면 기본값을 그대로 두고, 숫자가 있으면 '120분'처럼 바꿈.
+  let runtimeText = '상영 시간 미등록';
+  if (movie.runtime_min !== null) {
+    runtimeText = `${movie.runtime_min}분`;
+  }
+  // 두 값을 ' · '로 이어 한 줄로 표시함.
+  details.textContent = `${yearText} · ${runtimeText}`;
+  body.appendChild(details);
 
-  // watched가 참일 때만 추가 안내 문단을 만듦. 거짓이면 이 세 줄은 실행하지 않음.
-  // 최근 감상 기록에서는 watched:true로 호출하고, 일반 영화 목록에서는 기본값 false를 사용함.
+  // 장르가 하나 이상일 때만 장르 줄을 만듦. join(' · ')은 배열 항목 사이에 ' · '를 넣어 이음.
+  if (genres.length > 0) {
+    const genreLine = document.createElement('p');
+    genreLine.className = 'movie-card-genres';
+    genreLine.textContent = genres.join(' · ');
+    body.appendChild(genreLine);
+  }
+
+  // watched가 참일 때만 '감상한 영화' 표시를 만듦. 최근 감상 기록과 검색 결과에서 씀.
   if (watched) {
-    // 영화 제목·기본 정보와 별도로 '감상한 영화' 문구를 담을 문단을 새로 만듦.
     const watchedNote = document.createElement('p');
-    // 새 문단 안에 실제로 보일 문자열을 넣음. watched 여부를 DB에 저장하는 코드는 아님.
+    // badge는 Bootstrap의 작은 표시 클래스임. CSS가 포스터 왼쪽 위에 주황 띠로 띄움.
+    watchedNote.className = 'movie-card-watched badge';
+    // 실제로 보일 문자열을 넣음. watched 여부를 DB에 저장하는 코드는 아님.
     watchedNote.textContent = '감상한 영화';
-    // 부모 card의 마지막 자식으로 붙여 제목과 기본 정보 다음에 감상 여부가 나오게 함.
-    card.appendChild(watchedNote);
+    body.appendChild(watchedNote);
   }
   // 완성한 요소를 호출한 곳에 반환함. 호출한 페이지가 이 요소를 본문에 붙여 실제로 보여줌.
   return card;
@@ -220,36 +263,247 @@ const navigation = [
 ];
 
 /*
+ * isFirstBrandView(): 이번 브라우저 탭에서 처음 연 페이지인지 알려 줌.
+ * sessionStorage는 탭을 닫으면 지워지는 저장소임. 처음이면 표시를 남기고 true를 돌려줌.
+ * 그래서 로고가 모이는 등장 효과는 첫 페이지에서 한 번만 나오고, 메뉴로 이동한 뒤에는 바로 완성된 로고가 보임.
+ * 개인정보 보호 모드 등에서 sessionStorage가 오류를 내면 catch에서 false로 두어 효과 없이 지나감.
+ */
+function isFirstBrandView() {
+  let first = false;
+  try {
+    if (sessionStorage.getItem('filmlog-brand-gathered') === null) {
+      sessionStorage.setItem('filmlog-brand-gathered', 'yes');
+      first = true;
+    }
+  } catch (error) {
+    first = false;
+  }
+  return first;
+}
+
+/*
+ * mountBrandParticles(brand, word): 로고 링크 위에 입자 로고 canvas를 얹음.
+ * brand는 a.navbar-brand 링크, word는 그 안에서 FILMLOG 글자를 감싼 span임.
+ * 진짜 글자는 그대로 두어 화면 읽기 프로그램은 링크 이름을 'FILMLOG'로 읽음.
+ * canvas가 처음 그려진 뒤에만 진짜 글자를 투명하게 바꾸므로, JavaScript나 canvas가 안 되면 원래 글자 로고가 보임.
+ */
+function mountBrandParticles(brand, word) {
+  // layer는 canvas를 담는 빈 span임. common.css가 글자 줄보다 위아래 12px, 좌우 14px 크게 펼쳐 둠.
+  // 여유 공간이 있어야 마우스에 밀린 입자가 잘리지 않고 보임.
+  const layer = el('span', { className: 'brand-particles-layer' });
+  word.append(layer);
+  // 등장 효과는 첫 페이지에서만 'gather'로 켜고, 나머지는 'none'으로 바로 완성된 로고를 그림.
+  let intro = 'none';
+  if (isFirstBrandView()) {
+    intro = 'gather';
+  }
+
+  // readFontSize: 지금 CSS가 정한 로고 글자 크기(px)를 읽음. 글자 크기는 common.css 한 곳에서만 정하게 함.
+  function readFontSize() {
+    return parseFloat(getComputedStyle(word).fontSize);
+  }
+
+  // showParticles: canvas가 처음 그려지면 불림. 링크에 클래스를 붙여 CSS가 진짜 글자를 투명하게 바꾸게 함.
+  function showParticles() {
+    brand.classList.add('brand-particles-ready');
+  }
+
+  // style: 로고 글자에 실제로 적용된 CSS 값(글꼴 목록, 자간)을 읽어 옴.
+  const style = getComputedStyle(word);
+
+  // 설정값은 26px Anton 로고가 LED 전광판처럼 또렷한 점 글자로 보이도록 맞춘 값임.
+  // fontFamily는 'Anton' 하나가 아니라 CSS에서 계산된 글꼴 목록 전체를 넘김.
+  // Anton을 못 불러오면(글꼴 차단 등) 진짜 글자와 같은 대체 글꼴로 점을 만들어 글자 상자와 모양이 맞음.
+  // step 1.5와 particleSize 1: 레티나(2배) 화면에서 2픽셀 점이 3픽셀 간격으로 놓여 점 사이에 1픽셀 틈이 생김.
+  // 일반(1배) 화면에서는 particle-text.js가 간격을 화면 픽셀 정수 칸인 2px로 맞춰 1픽셀 점이 고르게 놓임.
+  // letterSpacing은 CSS의 letter-spacing(0.02em)을 그대로 읽어 진짜 글자와 너비를 맞춤. 'normal'이면 0으로 둠.
+  // scatter 14, gatherDuration 900, stagger 450: 작은 로고라 짧은 거리에서 1.3초 안에 모이게 함.
+  // pointerRepel 4, repelRadius 16: 마우스 둘레 16px 안의 점을 최대 4px만 밀어냄.
+  // 글자 획(4~5px)보다 작게 밀어 글자가 읽히는 채로 살짝 흔들리게 함. 누르려는 자리에서 로고가 크게 일그러지지 않음.
+  // clickBurst는 끔. 로고를 누르면 곧바로 메인 페이지로 이동하므로 폭발 효과를 볼 틈이 없음.
+  // highlightColor는 주황이라 밀려난 흰 점이 주황빛으로 물들었다가 제자리에서 다시 흰색이 됨.
+  createParticleText(layer, {
+    segments: [{ text: 'FILM', color: '#FFFFFF' }, { text: 'LOG', color: '#FF5A00' }],
+    fontFamily: style.fontFamily,
+    fontWeight: 400,
+    fontSize: readFontSize,
+    letterSpacing: parseFloat(style.letterSpacing) || 0,
+    step: 1.5,
+    particleSize: 1,
+    intro: intro,
+    scatter: 14,
+    gatherDuration: 900,
+    stagger: 450,
+    pointerRepel: 4,
+    repelRadius: 16,
+    clickBurst: false,
+    highlightColor: '#FF5A00',
+    onReady: showParticles
+  });
+}
+
+/*
+ * SONAR_QUIET_TARGETS: 이 선택자에 맞는 요소(와 그 안쪽)를 누르면 배경 파동을 만들지 않음.
+ * 링크·버튼·입력칸·라벨·펼치기(summary)·대화상자(dialog)·역할(role)이 있는 요소·키보드로 이동하는 요소·편집 영역처럼 누르면 따로 동작하는 요소임.
+ * 사진·영상·canvas·iframe처럼 그 자체를 보는 요소, 메인 페이지 소개 화면(.intro), 지도 영역(.map-canvas)도 넣음.
+ * 소개 화면과 지도는 격자를 덮고 있거나 따로 조준선 효과가 있어 그 위에서 파동이 생기면 보이지 않거나 겹침.
+ * [tabindex]에서 tabindex="-1"은 뺌. 본문 main#app이 '본문으로 바로가기'를 위해 tabindex="-1"을 갖고 있어 빼지 않으면 본문 어디를 눌러도 파동이 생기지 않음.
+ */
+const SONAR_QUIET_TARGETS = 'a, button, input, select, textarea, label, summary, dialog, [role], [tabindex]:not([tabindex="-1"]), [contenteditable], img, video, canvas, iframe, .intro, .map-canvas';
+
+/*
+ * mountSonarGrid(): 모든 페이지의 흰 바탕 위에 점 격자 배경을 한 장 깖.
+ * 먼저 배경 층 div.site-sonar를 만들어 body 맨 앞에 넣고, 그 층을 createSonarGrid()의 container로 넘김.
+ * 배경 층의 위치·층 순서는 common.css의 .site-sonar가 정함(화면 고정, 모든 내용보다 뒤). canvas는 sonar-grid.js가 층 안에 꽉 채워 붙임.
+ * aria-hidden="true"는 장식일 뿐인 이 층을 화면 읽기 프로그램이 건너뛰게 함.
+ * 색은 common.css의 :root 색 변수를 읽어 넘김. 색을 바꾸려면 CSS 변수만 바꾸면 됨.
+ * getPropertyValue()는 앞쪽 공백이 붙은 글자를 돌려주므로 trim()으로 공백을 지움.
+ * 설정값은 본문 글자가 늘 또렷하게 읽히는 것을 먼저 생각해 원본 시연값보다 옅고 작고 드물게 맞춘 값임.
+ *   spacing 26, ringWidth 90, speed 260: 원본 시연값 그대로임. 26px 간격이면 본문 한 줄(약 25px)에 점이 한 줄 정도 놓임.
+ *   dotRadius 1.1, baseOpacity 0.16: 조용한 점은 지름 약 2px의 옅은 회색이라 흰 바탕이 밋밋해 보이지 않을 만큼만 보임.
+ *   본문의 회색 글자보다 확실히 옅어서, 점이 글자 줄에 겹쳐도 '·' 같은 구분 기호로 잘못 읽히지 않음.
+ *   peakOpacity 0.42, amplitude 1.1: 고리 한가운데 점도 반지름 약 2.3px, 불투명도 42%까지만 커지고 진해져 옅은 살구색으로 보임.
+ *   고리가 작은 회색 글자(개봉 연도·상영 시간·저장일) 뒤를 지나가도 진한 주황 점이 글자 사이에 끼어 보이지 않음.
+ *   ringColor는 주황(--color-orange)이라 지나가는 고리가 사이트 강조색으로 물듦.
+ *   pingEvery 6, pingRest 3: 저절로 생기는 고리는 앞 고리가 화면을 다 지나간 뒤 3초를 쉬고 생김(최소 6초 간격).
+ *   1440×900 화면이면 고리가 약 7초 동안 지나가고 3초 쉼. 390×844 휴대폰 화면이면 약 4초 지나가고 3초 쉼.
+ *   쉬는 동안은 다시 그리기도 멈춰, 화면이 계속 움직이지 않고 배터리도 덜 씀. 원본 시연값(2.4초마다)은 고리가 겹쳐 쉬는 때가 없었음.
+ *   maxRings 4: 화면을 여러 번 눌러도 동시에 남는 고리는 4개까지임(원본은 6개).
+ *   pingArea [0.1, 0.15, 0.9, 0.85]: 저절로 생기는 고리가 화면 가장자리 쪽까지 고르게 생기게 원본 시연 범위보다 넓힘.
+ * pingSource를 document로 두어 화면 어디를 눌러도(조작 요소 제외) 누른 자리에서 고리가 퍼짐. 휴대폰에서는 톡 친 경우에만 퍼지고 스크롤에는 반응하지 않음.
+ * watch는 .main-wrap(본문과 바닥글을 감싼 영역)임. 메인 페이지의 소개 화면이 화면을 다 덮어 .main-wrap이 하나도 안 보이면 그리기를 멈춤.
+ */
+function mountSonarGrid() {
+  const tokens = getComputedStyle(document.documentElement);
+  const layer = el('div', { className: 'site-sonar' });
+  layer.setAttribute('aria-hidden', 'true');
+  // prepend는 body의 맨 앞에 넣음. 다른 내용보다 문서 순서상 앞에 있어 같은 층에서도 뒤쪽에 그려짐.
+  document.body.prepend(layer);
+  createSonarGrid(layer, {
+    color: tokens.getPropertyValue('--color-ink').trim(),
+    ringColor: tokens.getPropertyValue('--color-orange').trim(),
+    spacing: 26,
+    dotRadius: 1.1,
+    baseOpacity: 0.16,
+    peakOpacity: 0.42,
+    amplitude: 1.1,
+    ringWidth: 90,
+    speed: 260,
+    pingEvery: 6,
+    pingRest: 3,
+    maxRings: 4,
+    pingArea: [0.1, 0.15, 0.9, 0.85],
+    pingSource: document,
+    ignoreSelector: SONAR_QUIET_TARGETS,
+    watch: document.querySelector('.main-wrap')
+  });
+}
+
+/*
+ * mountDataCredit(): 모든 페이지 바닥글(footer)에 포스터·영화 정보의 출처(TMDB) 한 줄을 덧붙임.
+ * 포스터 이미지를 TMDB 주소에서 그대로 불러오므로 출처를 밝히고, TMDB의 승인·인증을 받은 사이트가 아님을 함께 적음.
+ * 바닥글은 HTML 7개에 똑같이 들어 있으므로, 같은 문장을 HTML마다 적지 않고 여기 한 곳에서만 붙임.
+ * 영화 자료(data/catalog.json)를 DB로 바꾸면 이 문장만 고치거나 이 함수 호출을 지우면 됨.
+ * 글자색·크기는 Bootstrap 클래스로만 정해 common.css를 고치지 않아도 됨.
+ *   small: 글자를 바닥글 기본 크기보다 조금 작게(0.875배) 만듦.
+ *   mt-2: 위쪽 팀 정보 줄과 조금 띄움.
+ *   text-reset: 링크 글자색을 바닥글의 회색으로 맞춤. 사이트 기본 링크색은 검정이라 검은 바닥글에서 보이지 않기 때문임.
+ *   text-decoration-underline: 같은 색이어도 링크임을 알 수 있게 밑줄을 그음.
+ */
+function mountDataCredit() {
+  // 페이지에 있는 첫 번째 footer 요소를 찾음. 없으면 null임.
+  const footer = document.querySelector('footer');
+  // 바닥글이 없는 페이지에서는 아무것도 하지 않고 끝냄.
+  if (footer === null) {
+    return;
+  }
+  // target="_blank"는 새 탭에서 열고, rel="noopener"는 새 탭이 이 페이지(window.opener)를 건드리지 못하게 막음.
+  const link = el('a', { className: 'text-reset text-decoration-underline', href: 'https://www.themoviedb.org', target: '_blank', rel: 'noopener' }, 'TMDB(themoviedb.org)');
+  // append는 기존 팀 정보 줄 뒤(바닥글 맨 끝)에 새 문단을 붙임.
+  footer.append(el('p', { className: 'small mt-2' }, '포스터·영화 정보 일부 출처: ', link, ' · 이 사이트는 TMDB의 승인·인증을 받지 않았습니다.'));
+}
+
+/*
+ * usePlaceholderPoster(event): 다른 사이트에서 불러오는 포스터가 실패하면 기본 포스터로 바꿈.
+ * 영화 포스터는 TMDB 주소에서 불러오므로 인터넷이 끊기거나 주소가 막히면 깨진 그림 아이콘이 보임.
+ * 그럴 때 저장소 안의 assets/posters/placeholder.jpg로 바꿔 빈 칸 대신 기본 포스터를 보여줌.
+ * img의 error 이벤트는 부모로 전달(버블링)되지 않으므로 mountShell()이 document에 '캡처 단계'로 등록함.
+ * 캡처 단계에서는 이벤트가 대상 img에 닿기 전에 document를 먼저 지나가므로, 페이지의 모든 img 실패를 한 곳에서 받을 수 있음.
+ * 영화 자료에 따라 달라지지 않도록 특정 주소(TMDB)를 적지 않고 '이 사이트와 다른 출처의 그림'만 바꿈.
+ * 이 사이트 안의 그림(지도, 기본 포스터)과 사진 보관함 사진(blob: 주소, 출처는 이 사이트)은 바꾸지 않음.
+ * 기본 포스터는 같은 출처라서, 기본 포스터마저 실패해도 다시 바꾸지 않아 반복되지 않음.
+ */
+function usePlaceholderPoster(event) {
+  // 캡처 단계에서는 그림 말고 다른 요소(script 등)의 error 이벤트도 지나가므로 img만 처리함.
+  const image = event.target;
+  if (image.tagName !== 'IMG') {
+    return;
+  }
+  // new URL(주소, 기준)은 상대 주소도 완전한 주소로 바꿔 줌. origin은 '프로토콜://호스트:포트' 부분임.
+  const url = new URL(image.src, location.href);
+  // 이 사이트와 같은 출처의 그림이면 그대로 둠.
+  if (url.origin === location.origin) {
+    return;
+  }
+  image.src = 'assets/posters/placeholder.jpg';
+}
+
+/*
  * mountShell(page): 공통 메뉴와 저장 위치 안내를 HTML의 빈 자리들에 넣음.
  * page는 'index', 'calendar'처럼 현재 페이지를 구분하는 값임.
  * export가 없으므로 다른 모듈에서 직접 가져올 수 없고, 아래 boot()가 내부에서 호출함.
  * 반환값은 없으며 기존 문서 요소의 자식들을 변경하는 함수임.
+ * 메뉴는 Bootstrap navbar 구조로 만듦:
+ *   nav.navbar > div.container-xl > a.navbar-brand(로고) + ul.navbar-nav > li.nav-item > a.nav-link
+ * 로고 안쪽은 a.navbar-brand > span.brand-particles-word(FILM + span LOG + 입자 canvas 자리)임.
  */
 function mountShell(page) {
   // ariaLabel은 이 내비게이션의 목적을 화면 읽기 프로그램에 알려주는 이름임.
-  const nav = el('nav', { ariaLabel: '주 메뉴' });
+  // navbar-expand는 화면 너비와 관계없이 메뉴를 가로로 펼치는 Bootstrap 클래스임.
+  // site-navbar는 이 프로젝트의 메뉴 막대 모양을 common.css에서 정할 때 쓰는 이름임.
+  // dataset: { bsTheme: 'dark' }는 data-bs-theme="dark" 속성이 되며,
+  // Bootstrap이 이 안쪽 요소들에 어두운 바탕용 글자색을 쓰게 함.
+  const nav = el('nav', { className: 'navbar navbar-expand site-navbar', ariaLabel: '주 메뉴', dataset: { bsTheme: 'dark' } });
+  // container-xl은 메뉴 내용을 본문과 같은 너비 안에 가두는 Bootstrap 클래스임.
+  const shell = el('div', { className: 'container-xl' });
+  // 왼쪽 로고 글자 링크임. FILMLOG는 가칭이며 누르면 메인 페이지로 이동함.
+  // 뒤쪽 LOG만 span으로 감싸 CSS가 주황색으로 칠함. 읽을 때는 'FILMLOG' 한 단어임.
+  // 글자 전체를 word span으로 한 번 더 감쌈. 입자 canvas가 이 글자 줄을 기준으로 정확히 겹쳐지게 하기 위함임.
+  const word = el('span', { className: 'brand-particles-word' }, 'FILM', el('span', { className: 'navbar-brand-accent' }, 'LOG'));
+  const brand = el('a', { className: 'navbar-brand', href: 'index.html' }, word);
   // ul은 메뉴 항목(li)들을 담을 목록임. 아직 nav 안에 들어 있지는 않음.
-  const list = el('ul');
+  const list = el('ul', { className: 'navbar-nav' });
   // 배열 구조 분해로 현재 반복 항목의 파일 이름을 key, 메뉴 이름을 title로 받음.
   for (const [key, title] of navigation) {
     // &&가 ||보다 먼저 계산되므로 다음과 같은 뜻임.
     // (현재 메뉴 key와 page가 같음) 또는 (상세 페이지 movie이면서 영화 검색 메뉴임).
     // 상세 페이지에는 별도 메뉴가 없으므로 영화 검색 메뉴를 현재 위치로 표시함.
     const active = key === page || page === 'movie' && key === 'movies';
-    // active가 참이면 이름 뒤에 ' (현재)'를 붙이고, 거짓이면 빈 문자열을 붙임.
-    // 예: key='movies'이면 href='movies.html'임. title='영화 검색'은 링크에 보일 글자임.
-    // 상세 페이지를 보고 있을 때도 active가 참이 되어 '영화 검색 (현재)'라고 표시함.
-    const link = el('a', { href: `${key}.html` }, `${title}${active ? ' (현재)' : ''}`);
-    // 현재 위치임을 보조 기술에도 전달함. 화면에 보이는 '(현재)'와 역할이 다름.
-    if (active) link.setAttribute('aria-current', 'page');
+    // 기본 클래스는 nav-link이고, 현재 메뉴에만 Bootstrap의 active 클래스를 더 붙여 굵은 글자 + 주황 밑줄 막대로 보여줌.
+    let linkClass = 'nav-link';
+    if (active) {
+      linkClass = 'nav-link active';
+    }
+    const link = el('a', { className: linkClass, href: `${key}.html` }, title);
+    // 현재 메뉴일 때만 두 가지를 더함.
+    // ' (현재)' 글자는 visually-hidden span에 넣어 메뉴 이름 뒤에 붙임. 화면에는 보이지 않고 화면 읽기 프로그램만 읽음.
+    // aria-current="page"로 현재 위치임을 보조 기술에도 전달함.
+    if (active) {
+      link.append(el('span', { className: 'visually-hidden' }, ' (현재)'));
+      link.setAttribute('aria-current', 'page');
+    }
     // li 안에 링크를 넣고, 완성한 li를 부모 list(ul)에 추가함.
-    // 각 반복에서 새로운 li/a가 만들어지므로 메뉴 항목들이 차례로 쌓임.
-    list.append(el('li', {}, link));
+    list.append(el('li', { className: 'nav-item' }, link));
   }
-  // 부모 nav에 메뉴 목록 ul을 붙임. nav → ul → li → a 계층이 완성됨.
-  nav.append(list);
+  // 로고와 메뉴 목록을 안쪽 묶음에 넣고, 그 묶음을 nav에 넣음.
+  shell.append(brand, list);
+  nav.append(shell);
   // replaceChildren은 대상 요소 자체는 유지하고 기존 자식들을 전달한 새 자식들로 교체함.
   document.querySelector('#sidebar').replaceChildren(nav);
+  // 메뉴가 문서에 들어간 뒤에 입자 로고를 얹음. 그래야 CSS 글자 크기와 위치를 읽을 수 있음.
+  mountBrandParticles(brand, word);
+  // 메뉴를 만든 뒤 배경 점 격자를 깖. 페이지마다 boot()가 한 번만 부르므로 격자도 한 장만 생김.
+  mountSonarGrid();
 
   // 페이지 HTML의 <header id="topbar"> 요소를 찾음. 새 header를 생성하는 명령은 아님.
   const topbar = document.querySelector('#topbar');
@@ -257,11 +511,16 @@ function mountShell(page) {
   // 부모 header 자체와 그 id는 유지됨. 다음 코드에서 알림 영역을 같은 header에 추가함.
   topbar.replaceChildren(el('p', {}, '저장 위치: 현재 브라우저'));
   // 감상 기록은 서버에 올리는 것이 아니라 이 사이트를 연 브라우저의 IndexedDB에 저장함.
-  // 안내를 본문 위에서 볼 수 있게, HTML에 있던 메시지 요소를 topbar 쪽으로 이동함.
+  // HTML에 있던 메시지 요소를 topbar 쪽으로 이동함. 화면에서는 common.css가 오른쪽 아래에 띄워 보여줌.
   const messages = document.querySelector('#messages');
   // querySelector는 요소가 없으면 null을 반환하므로, 존재할 때만 append함.
   // 이미 문서 안에 있는 요소를 append하면 복제하지 않고 원래 자리에서 새 자리로 옮김.
   if (messages) topbar.append(messages);
+  // 마지막으로 바닥글에 자료 출처 줄을 붙임. 바닥글은 본문 아래라 메뉴·본문 준비에 영향이 없음.
+  mountDataCredit();
+  // 포스터가 실패하면 기본 포스터로 바꾸도록 등록함. 세 번째 인자 true는 캡처 단계에서 받겠다는 뜻임.
+  // 본문(render)이 그림을 만들기 전에 등록되므로 처음 그리는 포스터부터 적용됨.
+  document.addEventListener('error', usePlaceholderPoster, true);
 }
 
 /*
@@ -377,7 +636,8 @@ export async function boot({ page, title, render }) {
       el('p', { className: 'muted' }, '위 오류 내용을 확인한 뒤 다시 시도해 주세요.'),
       // onclick에는 함수를 넘김. () => 없이 location.reload()를 쓰면 생성 즉시 실행됨.
       // location.reload()는 refresh()와 달리 브라우저의 현재 문서를 실제로 다시 불러옴.
-      el('button', { className: 'button', onclick: () => location.reload() }, '다시 시도')
+      // btn btn-link는 Bootstrap의 글자 버튼 모양임.
+      el('button', { className: 'btn btn-link', onclick: () => location.reload() }, '다시 시도')
     ));
   }
 }
