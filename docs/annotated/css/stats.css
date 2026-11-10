@@ -1,0 +1,458 @@
+/*
+ * stats.css — 감상 통계 페이지(stats.html)에서만 사용하는 배치와 모양임.
+ * stats.html에서 common.css 다음에 연결되므로, 공통 규칙은 그대로 두고 이 페이지 요소의 모양만 더함.
+ * 색은 common.css의 변수(--color-…)를 그대로 씀. 막대는 주황(--color-orange), 막대 바탕은 옅은 회색임.
+ * 구역 제목의 주황 세로 막대와 '지도에서 보기' 링크 모양은 common.css의 section-heading·text-link를 그대로 씀.
+ * 그래프는 그림 파일이나 라이브러리 없이 span의 width/height(%)만으로 그림. % 값은 stats.js가 계산해 넣음.
+ * 모든 선택자가 stats-로 시작하는 클래스나 id(또는 그 안의 요소)를 거치므로 다른 페이지 요소에 영향을 주지 않음.
+ */
+
+/* 요약 카드 6개를 담는 틀(dl). 넓은 화면에서는 한 줄에 6개를 같은 너비로 놓음. */
+/* minmax(0, 1fr)은 긴 글자 때문에 칸이 화면 밖으로 넘치지 않게 함. */
+.stats-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+/* 카드 하나: 얇은 회색 테두리 상자. 위에서부터 항목 이름 → 값 → 보충 설명 순으로 세로로 쌓음. */
+/* 흰 바탕을 깔아 뒤쪽 점 무늬 배경(site-sonar)이 숫자와 겹쳐 보이지 않게 함. */
+.stats-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--color-gray-300);
+  border-radius: 4px;
+  background: #ffffff;
+}
+
+/* 항목 이름(dt): 작은 회색 글자. Bootstrap의 기본 굵기(700)보다 조금 가볍게 둠. */
+.stats-card dt {
+  color: var(--color-gray-700);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* Bootstrap이 dd에 주는 기본 아래 여백을 없앰. 간격은 아래 규칙에서 따로 정함. */
+.stats-card dd {
+  margin: 0;
+}
+
+.stats-card .stats-card-value {
+  margin-top: 4px;
+  line-height: 1.2;
+}
+
+/* 값의 숫자는 크고 굵게, 단위(편·회·시간 등)는 작은 회색 글자로 써서 숫자가 먼저 눈에 들어오게 함. */
+/* 메인 페이지 요약(stat-card)의 숫자 크기(1.75rem)와 같게 맞춤. */
+.stats-card-value strong {
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.stats-card-value small {
+  margin-left: 2px;
+  color: var(--color-gray-700);
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+/* 별점 기록이 없을 때의 '별점 기록 없음' 문구. 숫자 자리보다 작게 쓰고 위아래 여백으로 높이를 비슷하게 맞춤. */
+.stats-card .stats-card-none {
+  padding: 6px 0 4px;
+  color: var(--color-gray-700);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* 보충 설명 줄. margin-top: auto는 남는 세로 공간을 위쪽 여백으로 써서, 같은 줄 카드들의 설명이 맨 아래에 나란히 놓이게 함. */
+.stats-card .stats-card-note {
+  margin-top: auto;
+  padding-top: 6px;
+  color: var(--color-gray-700);
+  font-size: 0.8125rem;
+}
+
+/* 평균 별점 앞의 별(★)은 주황색으로 칠함. 카드 안에서는 숫자에 맞춰 조금 크게 씀. */
+.stats-star {
+  color: var(--color-orange);
+}
+
+.stats-card-value .stats-star {
+  font-size: 1.5rem;
+}
+
+/* 통계 구역 전체 틀. 기본(좁은 화면)은 한 줄에 한 구역씩 세로로 쌓음. 넓은 화면 배치는 맨 아래 @media에 있음. */
+.stats-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 48px;
+  margin-top: 48px;
+}
+
+.stats-section {
+  min-width: 0;
+}
+
+/* 구역 제목 아래 요약 한 줄(예: '평균 ★ 3.6 · 별점 남긴 기록 18회'). 제목 아래 여백(16px)이 있어 위쪽을 조금 당김. */
+.stats-caption {
+  margin: -4px 0 16px;
+  font-size: 0.9375rem;
+}
+
+/* 그래프 아래 작은 설명(세는 기준 안내). */
+.stats-note {
+  margin: 12px 0 0;
+  color: var(--color-gray-700);
+  font-size: 0.8125rem;
+}
+
+/* 가로 막대 목록(장르·나라·개봉 연대): 목록 점(•)을 없애고 줄 사이를 얇은 선으로 나눔. */
+.stats-bars {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-gray-200);
+  list-style: none;
+}
+
+/* 한 줄 = 이름 | 막대 | 'N편 · N%'의 세 칸. 이름 칸과 숫자 칸 너비를 고정해 모든 줄의 막대가 같은 위치·같은 길이에서 시작함. */
+/* 칸 너비가 줄마다 달라지면 막대 바탕 길이도 달라져 길이 비교가 틀려지므로 auto 대신 고정 너비를 씀. */
+.stats-bar-row {
+  display: grid;
+  grid-template-columns: 6.5em minmax(0, 1fr) 6.5em;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+.stats-bar-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+/* 막대 바탕(track): 옅은 회색 띠. overflow: hidden으로 안쪽 주황 막대의 모서리를 바탕 모양에 맞춰 자름. */
+.stats-bar-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--color-gray-100);
+}
+
+/* 주황 막대(fill): 너비(%)는 stats.js가 style.width로 넣음. 가장 많은 줄이 100%임. */
+.stats-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--color-orange);
+}
+
+/* 오른쪽 숫자 칸: 오른쪽 정렬하고 줄바꿈하지 않음. 'N편'은 진하게, 비율은 회색으로 씀. */
+.stats-bar-value {
+  color: var(--color-gray-700);
+  font-size: 0.875rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.stats-bar-value strong {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+/* 세로 막대 그래프(별점 분포): 같은 너비의 칸 10개. 칸 사이 간격을 두지 않아 아래 기준선이 끊기지 않고 이어짐. */
+/* 막대끼리의 간격은 막대 너비(칸의 70%)로 만듦. */
+.stats-columns {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 월별 감상 수는 12달이므로 칸을 12개로 나눔. */
+.stats-columns.stats-months {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+/* 칸 하나: 위에는 막대 영역, 아래에는 이름을 세로로 쌓음. */
+.stats-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* 막대 영역: 높이를 고정하고 막대를 바닥(flex-end)에 붙임. 아래 테두리가 그래프의 기준선이 됨. */
+/* padding-top은 가장 긴 막대 위에 개수 글자가 들어갈 자리를 남겨 둠. */
+.stats-column-plot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 200px;
+  padding-top: 24px;
+  border-bottom: 1px solid var(--color-gray-500);
+}
+
+/* 주황 막대: 높이(%)는 stats.js가 style.height로 넣음. % 높이는 막대 영역의 안쪽 높이를 기준으로 계산됨. */
+/* Bootstrap이 box-sizing: border-box를 쓰므로 200px에서 padding-top 24px와 아래 테두리 1px를 뺀 175px가 100%임. */
+/* position: relative는 안쪽 개수 글자를 막대 기준으로 놓기 위함임. */
+.stats-column-bar {
+  position: relative;
+  width: 70%;
+  max-width: 40px;
+  border-radius: 2px 2px 0 0;
+  background: var(--color-orange);
+}
+
+/* 막대 위 개수 글자: bottom: 100%로 막대의 윗변 바로 위에 띄움. left: 50% + translateX(-50%)로 가운데 맞춤. */
+/* 막대 높이가 0이어도 글자는 기준선 바로 위에 보임. */
+.stats-column-count {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  padding-bottom: 2px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.4;
+  transform: translateX(-50%);
+}
+
+/* 0개인 칸은 숫자를 보통 굵기의 회색 글자로 써서, 굵은 검은 숫자인 기록 있는 칸이 먼저 보이게 함. */
+/* 색은 흰 바탕에서도 잘 읽히는 gray-700(명암비 약 6.7:1)을 씀. 더 옅은 gray-500은 약 3.4:1이라 작은 글자의 기준(4.5:1)에 못 미침. */
+.stats-column-zero .stats-column-count {
+  color: var(--color-gray-700);
+  font-weight: 400;
+}
+
+/* 막대 아래 이름(별점 '4.5', 달 '3월'). 연도가 있으면 그 아래 줄에 놓이도록 세로로 쌓고 가운데 맞춤. */
+.stats-column-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 6px;
+  color: var(--color-gray-700);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+/* 첫 막대와 1월 막대에만 붙는 연도. 작지만 진하게 써서 해가 바뀌는 곳을 알아보기 쉽게 함. */
+.stats-column-year {
+  color: var(--color-ink);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+/* 감독 목록과 배우 목록을 나란히 둠. 한 목록이 240px보다 좁아지면(휴대폰) auto-fit이 한 줄에 하나씩 쌓음. */
+.stats-people-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px 48px;
+}
+
+.stats-people-group {
+  min-width: 0;
+}
+
+/* '감독', '배우' 작은 제목. common.css의 #app h3보다 조금 작고 굵게 써서 구역 제목(h2) 아래의 작은 소제목처럼 보이게 함. */
+/* 아래 여백 8px는 Bootstrap 기본과 같은 값이며, 위 여백은 0으로 둠. */
+#app .stats-people-group h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* 순위 목록과 다시 본 영화 목록: 목록 번호·점을 없애고 맨 위에 얇은 선을 그음. */
+.stats-rank-list,
+.stats-rewatch-list {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-gray-200);
+  list-style: none;
+}
+
+/* 순위 한 줄: 순위 동그라미 | 이름 | 'N편'. 줄 높이를 48px 이상으로 두어 손가락으로 이름 링크를 누르기 쉽게 함. */
+.stats-rank-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+/* 순위 번호 동그라미: 검은 바탕에 흰 숫자. flex: 0 0 26px로 이름이 길어도 줄어들지 않게 함. */
+.stats-rank-number {
+  display: flex;
+  flex: 0 0 26px;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-ink);
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+/* 이름 링크가 남는 가로 공간을 모두 차지해 'N편'을 오른쪽 끝으로 밀어냄. */
+.stats-rank-list a {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.stats-rank-count {
+  color: var(--color-gray-700);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.stats-rewatch-list li {
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+/* 다시 본 영화 한 줄: 포스터와 글자를 가로로 놓은 링크. 지도 페이지의 영화 목록과 같은 모양임. */
+.stats-rewatch-list a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+/* 링크 전체에 밑줄을 긋지 않고, 마우스를 올리면 제목에만 밑줄을 그음. */
+.stats-rewatch-list a:hover strong {
+  text-decoration: underline;
+}
+
+/* 작은 포스터: 영화 포스터 비율(2:3)로 자름. 흰 포스터도 경계가 보이도록 아주 옅은 테두리를 안쪽에 그림. */
+.stats-rewatch-list img {
+  flex-shrink: 0;
+  width: 44px;
+  height: auto;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 2px;
+  outline: 1px solid rgba(0, 0, 0, 0.08);
+  outline-offset: -1px;
+  background: var(--color-gray-100);
+}
+
+/* 제목과 'N회 감상'을 위아래로 쌓음. */
+.stats-rewatch-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stats-rewatch-text strong {
+  font-weight: 600;
+}
+
+.stats-rewatch-text small {
+  color: var(--color-gray-700);
+  font-size: 0.8125rem;
+}
+
+/* 넓은 화면(992px 이상): 통계 구역을 두 칸으로 나눠 [장르|나라], [별점|월별], [감독·배우], [연대|다시 본 영화]로 둠. */
+/* 가로 막대 목록(장르·나라)끼리, 세로 막대 그래프(별점·월별)끼리 짝을 지어 옆 칸과 높이가 비슷해지게 함. */
+/* 목록 옆에 그래프를 두면 기록이 많을 때 목록만 길어져 그래프 아래가 크게 비기 때문임. */
+/* grid-template-areas는 칸 배치를 이름으로 그린 지도임. 따옴표 한 줄이 한 행이고, 같은 이름이 두 번 나오면 두 칸을 모두 차지함. */
+/* HTML 순서(장르 → 별점 → 나라 → 월별)는 그대로라, 좁은 화면과 화면 읽기 프로그램은 원래 순서를 따름. */
+@media (min-width: 992px) {
+  .stats-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "genre country"
+      "rating month"
+      "people people"
+      "decade rewatch";
+    gap: 56px 48px;
+  }
+
+  /* 각 구역을 id로 골라 위 지도의 이름 칸에 놓음. id는 stats.js의 makeSection()이 붙인 값임. */
+  #stats-genre {
+    grid-area: genre;
+  }
+
+  #stats-country {
+    grid-area: country;
+  }
+
+  #stats-rating {
+    grid-area: rating;
+  }
+
+  #stats-month {
+    grid-area: month;
+  }
+
+  /* 감독·배우 구역은 지도에서 'people people'이라 첫 칸부터 마지막 칸까지 한 줄을 모두 차지함. */
+  #stats-people {
+    grid-area: people;
+  }
+
+  #stats-decade {
+    grid-area: decade;
+  }
+
+  #stats-rewatch {
+    grid-area: rewatch;
+  }
+}
+
+/* 1200px보다 좁으면 카드 6개가 너무 좁아지므로 한 줄에 3개씩 두 줄로 놓음. */
+@media (max-width: 1199.98px) {
+  .stats-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* 휴대폰 화면(576px 미만): 카드는 두 개씩, 글자와 여백은 조금 줄이고, 그래프 높이도 낮춤. */
+@media (max-width: 575.98px) {
+  .stats-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .stats-card {
+    padding: 12px;
+  }
+
+  .stats-card-value strong {
+    font-size: 1.5rem;
+  }
+
+  .stats-layout {
+    margin-top: 40px;
+    gap: 40px;
+  }
+
+  /* 막대 줄의 이름·숫자 칸을 줄여 가운데 막대가 쓸 공간을 남김. 숫자 칸은 여전히 고정 너비라 막대 길이가 줄마다 같음. */
+  .stats-bar-row {
+    grid-template-columns: 5.5em minmax(0, 1fr) 5.25em;
+    gap: 10px;
+  }
+
+  .stats-column-plot {
+    height: 150px;
+  }
+
+  .stats-column-label {
+    font-size: 0.75rem;
+  }
+
+  /* 12달 막대는 한 칸이 약 28px로 좁아 '12월'과 연도 '2025'가 옆 칸과 붙지 않도록 글자를 더 작게, 자간을 조금 좁게 함. */
+  .stats-months .stats-column-label {
+    font-size: 0.6875rem;
+    letter-spacing: -0.02em;
+  }
+
+  .stats-months .stats-column-year {
+    font-size: 0.625rem;
+  }
+}

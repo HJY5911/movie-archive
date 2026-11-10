@@ -319,6 +319,10 @@
   "AchievementRule": [
     {"rule_id":"r01","metric":"unique_movie_count","target":3,"label":"세 편의 기억"},
     {"rule_id":"r02","metric":"runtime_total","target":180,"label":"영화와 함께한 세 시간"},
-    {"rule_id":"r03","metric":"genre_count","target":3,"label":"세 가지 취향"}
+    {"rule_id":"r03","metric":"genre_count","target":3,"label":"세 가지 취향"},
+    {"rule_id":"r04","metric":"unique_movie_count","target":1,"label":"입문자"},
+    {"rule_id":"r05","metric":"unique_movie_count","target":10,"label":"영화광"},
+    {"rule_id":"r06","metric":"runtime_total","target":1440,"label":"영화로 보낸 하루"},
+    {"rule_id":"r07","metric":"genre_count","target":6,"label":"장르 탐험가"}
   ]
 }
