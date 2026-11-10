@@ -85,15 +85,17 @@ boot({
       try {
         const now = new Date();
 
-        const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
         const picks = [0, 1, 2, 0, 3, 4];
 
         for (const [i, position] of picks.entries()) {
+          let watchedDate;
+          if (i < 3) watchedDate = new Date(now.getFullYear(), now.getMonth() - (3 - i), 10 + i);
+          else watchedDate = new Date(now.getFullYear(), now.getMonth(), Math.min(now.getDate(), i - 2));
+
           await mutateWatchLog(repo, catalog, 'create', {
             movie_id: catalog.Movie[position % catalog.Movie.length].movie_id,
 
-            watched_on: `${prefix}-${String(Math.max(1, Math.min(now.getDate(), i + 1))).padStart(2, '0')}`,
+            watched_on: `${watchedDate.getFullYear()}-${String(watchedDate.getMonth() + 1).padStart(2, '0')}-${String(watchedDate.getDate()).padStart(2, '0')}`,
 
             rating: [4.5, 3.5, null, 5, 4, 0.5][i],
 

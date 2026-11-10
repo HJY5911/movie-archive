@@ -235,11 +235,6 @@ boot({
         // 여기서 쓰는 getFullYear/getMonth/getDate는 브라우저 환경의 현지 날짜를 읽음.
         const now = new Date();
 
-        // getFullYear(): 연도. getMonth(): 0~11이므로 사람이 보는 월에는 1을 더함.
-        // String(...): 숫자를 문자열로 바꾸고 padStart(2, '0'): 두 자리가 되도록 앞에 0을 붙임.
-        // 예: 2026년 10월이면 '2026-10', 3월이면 '2026-03'임.
-        const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
         // 영화 목록에서 고를 위치임. 배열은 0부터 시작하므로 0은 첫 번째 영화임.
         // 0을 두 번 넣어 같은 영화를 다시 감상한 상황도 확인하도록 만들었음.
         // 따라서 예시 기록 6개는 서로 다른 영화 6편을 뜻하지 않음.
@@ -248,6 +243,24 @@ boot({
         // entries()는 [배열 인덱스, 그 위치의 값] 쌍을 차례로 줌.
         // 여기서 i는 0~5의 반복 번호, position은 picks에 적힌 영화 선택 위치임.
         for (const [i, position] of picks.entries()) {
+          // 예시 기록 6개를 한 달에 몰지 않고 이번 달을 포함한 최근 넉 달에 나눠 저장함.
+          // 그래야 통계 페이지의 월별 그래프와 캘린더에서 여러 달의 기록을 확인할 수 있음.
+          // watchedDate는 이번 기록의 감상 날짜를 담는 Date 객체임.
+          // 아래 if/else 중 한쪽에서 값을 대입하므로 const가 아닌 let으로 선언만 해 둠.
+          let watchedDate;
+          // 앞의 세 기록(i가 0, 1, 2)은 각각 3달 전, 2달 전, 1달 전에 한 건씩 넣음.
+          // 3 - i가 3, 2, 1이 되며, 일은 10 + i로 10일, 11일, 12일을 씀.
+          // 10~12일은 2월을 포함한 모든 달에 있으므로 날짜가 다음 달로 넘어가지 않음.
+          // new Date(연, 월, 일)은 월 값이 0보다 작으면 연도를 자동으로 앞당김.
+          // 예: 2026년 1월이면 getMonth()가 0이고, 0 - 3 = -3은 2025년 10월로 계산됨.
+          // 모두 1~3달 전의 날짜이므로 오늘보다 뒤의 날짜가 되지 않음.
+          if (i < 3) watchedDate = new Date(now.getFullYear(), now.getMonth() - (3 - i), 10 + i);
+          // 나머지 세 기록(i가 3, 4, 5)은 이번 달에 넣음. i - 2가 1, 2, 3이므로 1일, 2일, 3일이 됨.
+          // getDate()는 이번 달의 '일'임. getDay()는 요일이므로 서로 다름.
+          // Math.min(오늘 날짜, i - 2)로 오늘 이후의 날짜를 피함. i - 2가 1 이상이라 결과도 최소 1일임.
+          // 오늘이 1일이면 세 기록 모두 1일에 저장되므로 같은 날 여러 기록이 생길 수 있음.
+          else watchedDate = new Date(now.getFullYear(), now.getMonth(), Math.min(now.getDate(), i - 2));
+
           // await는 이번 저장이 성공하거나 실패할 때까지 이 이벤트 함수의 다음 줄을 기다림.
           // UI 전체를 멈추는 것은 아님. 성공하면 다음 기록으로 진행하며 실패하면 catch로 감.
           // 'create'는 새 감상 기록을 추가하라는 구분값임.
@@ -258,11 +271,12 @@ boot({
             // 이렇게 배열 범위를 넘지 않는 위치로 순환한 뒤, 그 영화 객체의 movie_id를 꺼냄.
             movie_id: catalog.Movie[position % catalog.Movie.length].movie_id,
 
-            // getDate()는 이번 달의 '일'임. getDay()는 요일이므로 서로 다름.
-            // i+1로 1~6일을 만들되, Math.min(오늘 날짜, i+1)으로 오늘 이후 날짜를 피함.
-            // Math.max(1, ...)는 최소 1일을 보장함. padStart로 01~06처럼 두 자리를 맞춤.
-            // 오늘이 3일이면 01, 02, 03, 03, 03, 03에 저장되므로 같은 날 여러 기록이 생길 수 있음.
-            watched_on: `${prefix}-${String(Math.max(1, Math.min(now.getDate(), i + 1))).padStart(2, '0')}`,
+            // 위에서 정한 날짜를 저장 형식인 'YYYY-MM-DD' 문자열로 바꿈.
+            // getFullYear(): 연도. getMonth(): 0~11이므로 사람이 보는 월에는 1을 더함.
+            // String(...): 숫자를 문자열로 바꾸고 padStart(2, '0'): 두 자리가 되도록 앞에 0을 붙임.
+            // toISOString()은 UTC 기준이라 한국 시간과 날짜가 하루 어긋날 수 있어 현지 날짜 값을 직접 이어 붙임.
+            // 예: 2026년 11월 10일에 누르면 2026-08-10, 2026-09-11, 2026-10-12, 2026-11-01, 2026-11-02, 2026-11-03이 됨.
+            watched_on: `${watchedDate.getFullYear()}-${String(watchedDate.getMonth() + 1).padStart(2, '0')}-${String(watchedDate.getDate()).padStart(2, '0')}`,
 
             // 배열 뒤의 [i]는 이번 반복 번호에 해당하는 별점을 하나 고름.
             // null은 '0점'이 아니라 별점을 입력하지 않았다는 의미임.
