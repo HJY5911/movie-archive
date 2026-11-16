@@ -1,5 +1,6 @@
 import { boot, el, showMessage } from '../ui.js';
 import { mutateWatchLog, manageMedia } from '../repository.js';
+import { todayText, WATCH_DATE_MIN } from '../validation.js';
 
 const parameters = new URLSearchParams(location.search);
 const movieId = parameters.get('id');
@@ -10,16 +11,9 @@ let busy = false;
 let statusText = '';
 let statusIsError = false;
 
-function today() {
-  const date = new Date();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
 function createEmptyDraft() {
   return {
-    watched_on: today(),
+    watched_on: todayText(),
     rating: '',
     review_text: ''
   };
@@ -172,6 +166,8 @@ async function renderMovie(context) {
     type: 'date',
     className: 'form-control',
     required: true,
+    min: WATCH_DATE_MIN,
+    max: todayText(),
     value: draft.watched_on,
     disabled: busy
   });

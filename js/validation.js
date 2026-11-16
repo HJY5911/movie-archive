@@ -30,6 +30,15 @@ export function isValidCalendarDate(value) {
   return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
 
+export const WATCH_DATE_MIN = '1900-01-01';
+
+export function todayText() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 export function validateWatchLog(payload, catalog) {
   const fields = {};
 
@@ -40,6 +49,8 @@ export function validateWatchLog(payload, catalog) {
   if (!movieExists) fields.movie_id = '목록에 있는 영화를 선택해 주세요.';
 
   if (!isValidCalendarDate(input.watched_on)) fields.watched_on = '실제 존재하는 감상 날짜를 입력해 주세요.';
+  else if (input.watched_on > todayText()) fields.watched_on = '감상 날짜는 오늘 이후로 정할 수 없습니다.';
+  else if (input.watched_on < WATCH_DATE_MIN) fields.watched_on = '감상 날짜는 1900년 1월 1일 이후여야 합니다.';
 
   let rating = null;
   const rawRating = input.rating;
