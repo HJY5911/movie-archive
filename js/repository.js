@@ -1,7 +1,9 @@
 import { normalizeSearch } from './selectors.js';
 import { validateWatchLog, validateMedia, MEDIA_MAX_TOTAL_BYTES } from './validation.js';
+import { apiRequest, requireLogin, mountAccountBar, watchSession, clearPrivateScreen } from './server-session.js';
 
-const DATABASE_NAME = 'movie_journal';
+// 기존 프로젝트의 demo 기록/사진에는 접근하지 않는 별도 사진 저장소입니다.
+const DATABASE_NAME = 'movie_journal_server_photos';
 const DATABASE_VERSION = 1;
 const CATALOG_TABLES = [
   'Movie', 'MovieAlias', 'Person', 'MovieCredit', 'Genre', 'MovieGenre',
@@ -218,12 +220,12 @@ function makeId() {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-function ensureVersion(row, expectedVersion) {
-  if (!Number.isInteger(expectedVersion) || expectedVersion < 1) throw new Error('기록 버전이 없습니다. 새로고침 후 다시 시도하세요.');
-  if ((row.version || 1) !== expectedVersion) throw new Error('다른 탭에서 이 기록을 변경했습니다. 새로고침으로 최신 내용을 확인한 뒤 다시 시도하세요.');
-}
-
 export async function openRepository(options = {}) {
+  const session = await apiRequest('/api/session');
+  if (!session.profile) {
+    requireLogin();
+    throw new Error('로그인 화면으로 이동합니다.');
+  }
   if (!globalThis.indexedDB) throw new Error('이 브라우저는 IndexedDB 저장을 지원하지 않습니다. 최신 브라우저로 실행하세요.');
   const name = options.name || DATABASE_NAME;
   const version = options.version || DATABASE_VERSION;
@@ -260,26 +262,46 @@ export async function openRepository(options = {}) {
   try {
     const profile = await transaction(db, ['Profile'], 'readwrite', (tx, request, finish) => {
       const store = tx.objectStore('Profile');
-      request(store.get('demo'), existing => {
-        const row = existing || { profile_id: 'demo', display_name: '나의 필름로그', created_at: new Date().toISOString() };
-        if (!existing) request(store.add(row));
-        finish(row);
-      });
+      request(store.put(session.profile));
+      finish(session.profile);
     });
-    return { db, profile };
+    mountAccountBar(session);
+    watchSession(profile.profile_id);
+    return { db, profile, csrfToken: session.csrf_token };
   } catch (error) { db.close(); throw error; }
 }
 
-export async function readSnapshot(repo) {
+// 페이지의 호출 방식과 반환 형식은 유지하고 저장 위치만 서버로 바꿉니다.
+async function serverRequest(repo, path, options = {}) {
   ensureRepository(repo);
-  const profileId = repo.profile.profile_id;
-  const result = await transaction(repo.db, ['Profile', 'WatchLog', 'MediaAsset'], 'readonly', (tx, request, finish) => {
-    const snapshot = { profile: null, logs: [], assets: [] };
-    request(tx.objectStore('Profile').get(profileId), profile => { ensureProfile(profile); snapshot.profile = profile; });
-    request(tx.objectStore('WatchLog').index('profile_id').getAll(profileId), rows => { snapshot.logs = rows; });
-    request(tx.objectStore('MediaAsset').index('profile_id').getAll(profileId), rows => { snapshot.assets = rows; });
-    finish(snapshot);
+  try {
+    return await apiRequest(path, {
+      ...options, csrfToken: repo.csrfToken, profileId: repo.profile.profile_id
+    });
+  } catch (error) {
+    if (error.status === 401) {
+      clearPrivateScreen();
+      requireLogin();
+    } else if (error.code === 'account_changed') {
+      clearPrivateScreen();
+      location.reload();
+    }
+    throw error;
+  }
+}
+
+export async function readSnapshot(repo) {
+  const remote = await serverRequest(repo, '/api/snapshot');
+  // 서버가 잘못된 계정의 응답을 주어도 화면에 섞어 표시하지 않습니다.
+  if (remote.profile?.profile_id !== repo.profile.profile_id) {
+    clearPrivateScreen();
+    location.reload();
+    throw new Error('계정이 변경되었습니다. 새로고침해 주세요.');
+  }
+  const assets = await transaction(repo.db, ['MediaAsset'], 'readonly', (tx, request, finish) => {
+    request(tx.objectStore('MediaAsset').index('profile_id').getAll(repo.profile.profile_id), finish);
   });
+  const result = { profile: remote.profile, logs: remote.logs, assets };
   result.logs.sort((a, b) => b.watched_on.localeCompare(a.watched_on) || b.created_at.localeCompare(a.created_at) || a.log_id.localeCompare(b.log_id));
   result.assets.sort((a, b) => b.created_at.localeCompare(a.created_at) || a.asset_id.localeCompare(b.asset_id));
   return result;
@@ -290,39 +312,23 @@ export async function mutateWatchLog(repo, catalog, action, payload) {
   requirePayload(payload);
   if (!['create', 'update', 'delete'].includes(action)) throw new Error('지원하지 않는 감상 기록 작업입니다.');
   const valid = action === 'delete' ? null : validateWatchLog(payload, catalog);
-  if (action !== 'create') requireId(payload.log_id, '감상 기록 ID');
-  const profileId = repo.profile.profile_id;
-  return transaction(repo.db, ['Profile', 'WatchLog'], 'readwrite', (tx, request, finish) => {
-    request(tx.objectStore('Profile').get(profileId), profile => {
-      ensureProfile(profile);
-      const store = tx.objectStore('WatchLog');
-      if (action === 'create') {
-        const now = new Date().toISOString();
-        const row = { ...valid, log_id: makeId(), profile_id: profileId, created_at: now, updated_at: now, version: 1 };
-        request(store.add(row));
-        finish(row.log_id);
-        return;
-      }
-      request(store.get(payload.log_id), current => {
-        requireOwner(current, profileId, '감상 기록');
-        ensureVersion(current, payload.expected_version);
-        if (action === 'delete') request(store.delete(current.log_id));
-        else {
-          if (current.movie_id !== valid.movie_id) throw new Error('기록의 영화는 변경할 수 없습니다. 다른 영화는 새 기록으로 추가하세요.');
-          const updatedAt = new Date(Math.max(Date.now(), Date.parse(current.updated_at) + 1)).toISOString();
-          request(store.put({
-            ...current, ...valid, log_id: current.log_id, profile_id: profileId,
-            created_at: current.created_at, updated_at: updatedAt, version: (current.version || 1) + 1
-          }));
-        }
-        finish(current.log_id);
-      });
-    });
+  if (action !== 'create') {
+    requireId(payload.log_id, '감상 기록 ID');
+    if (!Number.isInteger(payload.expected_version) || payload.expected_version < 1) {
+      throw new Error('기록 버전이 없습니다. 새로고침 후 다시 시도하세요.');
+    }
+  }
+  const path = action === 'create' ? '/api/watch-logs' : `/api/watch-logs/${encodeURIComponent(payload.log_id)}`;
+  const body = action === 'create' ? valid : { ...valid, expected_version: payload.expected_version };
+  const result = await serverRequest(repo, path, {
+    method: { create: 'POST', update: 'PATCH', delete: 'DELETE' }[action], body
   });
+  return result.log_id;
 }
 
 export async function manageMedia(repo, catalog, action, payload) {
-  ensureRepository(repo);
+  // 사진 원본은 서버에 보내지 않습니다. 현재 로그인 계정 확인 후 로컬 사진만 다룹니다.
+  await serverRequest(repo, '/api/session');
   requirePayload(payload);
   if (!['add', 'read', 'delete'].includes(action)) throw new Error('지원하지 않는 사진 작업입니다.');
   let validated;

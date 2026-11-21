@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="나만의 영화 감상 기록을 이어가는 FILMLOG">
+  <title>로그인 · FILMLOG</title>
+  <link rel="icon" type="image/jpeg" href="assets/favicon.jpg">
+  <link rel="stylesheet" href="css/common.css">
+  <link rel="stylesheet" href="css/account.css" data-account-styles>
+  <script type="module" src="js/account.js"></script>
+</head>
+<body class="account-page">
+  <a href="#account-main" class="skip-link">본문으로 바로가기</a>
+  <header class="account-header"><a class="account-brand" href="index.html" aria-label="FILMLOG 메인">FILM<span>LOG</span></a><span>나의 영화 감상 아카이브</span></header>
+  <main id="account-main" class="account-layout">
+    <section class="account-intro" aria-labelledby="intro-title">
+      <p class="account-kicker">YOUR PERSONAL FILM ARCHIVE</p>
+      <h1 id="intro-title">영화가 끝나도,<br>기록은 계속.</h1>
+      <p class="account-lead">감상한 영화와 나의 별점을 모으고,<br>통계와 업적으로 취향을 발견하세요.</p>
+      <div class="account-storage-note">
+        <p><strong>감상 기록은 계정에</strong><br>다른 기기에서도 로그인하면 이어서 볼 수 있어요.</p>
+        <p><strong>티켓과 포스터 사진은 이 브라우저에</strong><br>사진은 계정별로 구분되며 다른 기기로 옮겨지지 않아요.</p>
+      </div>
+    </section>
+    <section class="account-card" aria-labelledby="account-title">
+      <div id="signed-in" hidden>
+        <p class="account-kicker">WELCOME BACK</p>
+        <h2>이미 로그인되어 있어요</h2>
+        <p id="signed-in-name"></p>
+        <a id="continue-link" class="btn btn-primary account-submit" href="index.html">내 기록으로 이동</a>
+        <button id="switch-account" type="button" class="btn btn-link account-switch">로그아웃 후 다른 계정으로 로그인</button>
+      </div>
+      <div id="auth-forms">
+        <div class="account-tabs" role="group" aria-label="계정 메뉴">
+          <button type="button" id="login-tab" aria-pressed="true" aria-controls="login-form">로그인</button>
+          <button type="button" id="register-tab" aria-pressed="false" aria-controls="register-form">회원가입</button>
+        </div>
+        <h2 id="account-title">다시 만나 반가워요</h2>
+        <p id="account-subtitle" class="muted">내 계정으로 감상 기록을 이어가세요.</p>
+        <form id="login-form">
+          <fieldset disabled>
+            <div class="account-field"><label for="login-username">아이디</label><input id="login-username" name="username" class="form-control" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="32" pattern="[A-Za-z0-9_]{3,32}" required></div>
+            <div class="account-field"><label for="login-password">비밀번호</label><input id="login-password" name="password" class="form-control" type="password" autocomplete="current-password" minlength="8" maxlength="128" required></div>
+            <button class="btn btn-primary account-submit" type="submit">로그인</button>
+          </fieldset>
+        </form>
+        <form id="register-form" hidden>
+          <fieldset disabled>
+            <div class="account-field"><label for="register-username">아이디</label><input id="register-username" name="username" class="form-control" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="32" pattern="[A-Za-z0-9_]{3,32}" aria-describedby="username-hint" required><small id="username-hint">영문, 숫자, 밑줄(_)을 조합한 3~32자</small></div>
+            <div class="account-field"><label for="register-name">닉네임</label><input id="register-name" name="display_name" class="form-control" autocomplete="nickname" minlength="1" maxlength="40" required></div>
+            <div class="account-field"><label for="register-password">비밀번호</label><input id="register-password" name="password" class="form-control" type="password" autocomplete="new-password" minlength="8" maxlength="128" aria-describedby="password-hint" required><small id="password-hint">8~128자로 입력해 주세요.</small></div>
+            <div class="account-field"><label for="register-confirm">비밀번호 확인</label><input id="register-confirm" name="password_confirm" class="form-control" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></div>
+            <button class="btn btn-primary account-submit" type="submit">가입하고 시작하기</button>
+          </fieldset>
+        </form>
+      </div>
+      <p id="account-status" class="account-status" role="status" aria-live="polite">로그인 상태를 확인하는 중입니다.</p>
+      <p id="account-error" class="account-error" role="alert" hidden></p>
+      <button id="retry-session" class="btn btn-link" type="button" hidden>연결 다시 시도</button>
+      <p class="account-existing-note">기존 브라우저에 저장한 예시 기록은 새 계정에 자동으로 옮겨지지 않습니다.</p>
+      <noscript><p class="account-error">로그인하려면 브라우저의 JavaScript를 켜 주세요.</p></noscript>
+    </section>
+  </main>
+  <footer class="account-footer">&copy; 2026 32조. 팀프로젝트.</footer>
+</body>
+</html>
