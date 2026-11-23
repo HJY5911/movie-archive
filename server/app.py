@@ -16,12 +16,12 @@ from uuid import uuid4
 
 from dotenv import load_dotenv
 from flask import Flask, abort, g, jsonify, request, send_from_directory
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import and_, delete, func, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .database import auth_sessions, make_engine, metadata, profiles, watch_logs
+from .database import auth_sessions, init_schema, make_engine, profiles, watch_logs
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 WATCH_DATE_MIN = date(1900, 1, 1)
@@ -290,6 +290,50 @@ def create_app(config_override=None):
             )).mappings().all()
         return jsonify(profile=public_profile(g.profile), logs=[dict(row) for row in rows])
 
+    @app.get("/api/movies/<movie_id>/community")
+    def movie_community(movie_id):
+        profile_id = require_login()
+        if movie_id not in movie_ids:
+            raise ApiError("영화를 찾지 못했습니다.", 404, "not_found")
+        raw_offset = request.args.get("offset", "0")
+        if not re.fullmatch(r"[0-9]{1,10}", raw_offset) or int(raw_offset) > 2147483647:
+            raise ApiError("관람평 목록 위치가 올바르지 않습니다.")
+        offset, page_size = int(raw_offset), 20
+        newer = watch_logs.alias("newer_rating")
+        # 한 사람이 여러 번 기록해도 최근에 저장한 별점 한 개만 평균에 반영하는 조건입니다.
+        newer_rating = select(newer.c.log_id).where(
+            newer.c.movie_id == watch_logs.c.movie_id,
+            newer.c.profile_id == watch_logs.c.profile_id,
+            newer.c.rating.is_not(None),
+            or_(
+                newer.c.updated_at > watch_logs.c.updated_at,
+                and_(newer.c.updated_at == watch_logs.c.updated_at, newer.c.created_at > watch_logs.c.created_at),
+                and_(newer.c.updated_at == watch_logs.c.updated_at, newer.c.created_at == watch_logs.c.created_at,
+                     newer.c.log_id > watch_logs.c.log_id),
+            ),
+        ).exists()
+        rating_query = select(
+            func.avg(watch_logs.c.rating).label("average_rating"),
+            func.count().label("rating_count"),
+        ).where(watch_logs.c.movie_id == movie_id, watch_logs.c.rating.is_not(None), ~newer_rating)
+        # 공개 응답에는 닉네임과 별점, 관람평만 포함하며 개인 식별자와 감상 날짜는 제외하는 구조입니다.
+        review_query = select(profiles.c.display_name, watch_logs.c.rating, watch_logs.c.review_text).join(
+            profiles, watch_logs.c.profile_id == profiles.c.profile_id,
+        ).where(
+            watch_logs.c.movie_id == movie_id, watch_logs.c.is_public.is_(True),
+            watch_logs.c.profile_id != profile_id,
+            watch_logs.c.review_text.is_not(None), func.length(func.trim(watch_logs.c.review_text)) > 0,
+        ).order_by(watch_logs.c.updated_at.desc(), watch_logs.c.created_at.desc(), watch_logs.c.log_id.desc()).offset(offset).limit(page_size + 1)
+        with engine.connect() as connection:
+            rating = connection.execute(rating_query).mappings().one()
+            reviews = connection.execute(review_query).mappings().all()
+        return jsonify(
+            average_rating=float(rating["average_rating"]) if rating["average_rating"] is not None else None,
+            rating_count=rating["rating_count"],
+            reviews=[dict(row) for row in reviews[:page_size]],
+            next_offset=offset + page_size if len(reviews) > page_size else None,
+        )
+
     def validate_watch_log(values):
         fields = {}
         movie_id, watched_on = values.get("movie_id"), values.get("watched_on")
@@ -323,14 +367,20 @@ def create_app(config_override=None):
                 fields["review_text"] = "감상평은 10,000자 이하의 글자로 입력하세요."
             else:
                 review = review.strip() or None
+        if "is_public" in values and not isinstance(values["is_public"], bool):
+            fields["is_public"] = "관람평 공개 여부는 참 또는 거짓으로 입력해 주세요."
         if fields:
             raise ApiError("입력한 감상 기록을 확인해 주세요.", fields=fields)
-        return {"movie_id": movie_id, "watched_on": watched_on, "rating": rating, "review_text": review}
+        validated = {"movie_id": movie_id, "watched_on": watched_on, "rating": rating, "review_text": review}
+        if "is_public" in values:
+            validated["is_public"] = values["is_public"]
+        return validated
 
     @app.post("/api/watch-logs")
     def create_watch_log():
         profile_id = require_login()
         values = validate_watch_log(payload())
+        values.setdefault("is_public", False)
         log_id, timestamp = str(uuid4()), utc_now()
         with engine.begin() as connection:
             connection.execute(insert(watch_logs).values(
@@ -390,5 +440,5 @@ def create_app(config_override=None):
 
 
 def init_database(app):
-    """Create only this app's tables; never create, replace, or drop databases."""
-    metadata.create_all(app.extensions["filmlog_engine"])
+    """데이터베이스와 기존 기록을 보존하고 앱에 필요한 구조만 추가하는 초기화입니다."""
+    init_schema(app.extensions["filmlog_engine"])

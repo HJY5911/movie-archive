@@ -1,5 +1,5 @@
 import { boot, el, showMessage } from '../ui.js';
-import { mutateWatchLog, manageMedia } from '../repository.js';
+import { mutateWatchLog, manageMedia, readMovieCommunity } from '../repository.js';
 import { todayText, WATCH_DATE_MIN } from '../validation.js';
 
 const parameters = new URLSearchParams(location.search);
@@ -15,7 +15,8 @@ function createEmptyDraft() {
   return {
     watched_on: todayText(),
     rating: '',
-    review_text: ''
+    review_text: '',
+    is_public: false
   };
 }
 
@@ -71,6 +72,73 @@ function creditNames(catalog, role) {
   return names.join(', ');
 }
 
+function createCommunity(repo) {
+  const summary = el('div', { className: 'community-summary', id: 'community-summary', ariaLive: 'polite' });
+  const rating = el('p', { className: 'detail-rating' }, '전체 평균 별점을 불러오는 중입니다.');
+  const help = el('p', { className: 'muted community-help' }, '사용자별 최근에 저장한 별점 1개를 반영합니다.');
+  summary.append(rating, help);
+
+  const panel = el('section', { className: 'page-section community-panel', 'aria-labelledby': 'community-title' });
+  const heading = el('h2', { id: 'community-title' }, '다른 사용자들의 공개 관람평');
+  const note = el('p', { className: 'muted' }, '작성자가 공개를 선택한 관람평만 표시됩니다. 내 관람평은 아래 나의 감상 기록에서 확인할 수 있습니다.');
+  const list = el('div', { className: 'community-reviews' });
+  const status = el('p', { className: 'status', ariaLive: 'polite' }, '공개 관람평을 불러오는 중입니다.');
+  const more = el('button', { type: 'button', className: 'btn btn-link', hidden: true }, '관람평 더 보기');
+  panel.append(heading, note, list, status, more);
+  let disposed = false;
+  let loading = false;
+  let nextOffset = 0;
+
+  async function load() {
+    if (loading || disposed || nextOffset === null) return;
+    loading = true;
+    more.disabled = true;
+    status.textContent = '공개 관람평을 불러오는 중입니다.';
+    status.className = 'status';
+    try {
+      const result = await readMovieCommunity(repo, movieId, nextOffset);
+      // 새 화면으로 바뀐 뒤 도착한 응답을 이전 화면에 반영하지 않기 위한 확인입니다.
+      if (disposed || !panel.isConnected) return;
+      if (nextOffset === 0) list.replaceChildren();
+      rating.replaceChildren();
+      if (result.rating_count > 0) {
+        rating.append(
+          el('span', { className: 'detail-rating-star', ariaHidden: 'true' }, '★'),
+          el('strong', {}, result.average_rating.toFixed(1)),
+          el('span', { className: 'muted' }, `/ 5 · 전체 평균 별점 · ${result.rating_count}명 참여`)
+        );
+      } else {
+        rating.append(el('span', { className: 'muted' }, '전체 평균 별점 · 아직 등록된 별점이 없습니다.'));
+      }
+      for (const row of result.reviews) {
+        const card = el('article', { className: 'community-review' });
+        const header = el('div', { className: 'record-heading' },
+          el('strong', {}, row.display_name),
+          el('span', { className: 'rating' }, ratingLabel(row.rating))
+        );
+        card.append(header, el('p', { className: 'review-text' }, row.review_text));
+        list.append(card);
+      }
+      nextOffset = result.next_offset;
+      status.textContent = list.childElementCount === 0 ? '아직 다른 사용자가 공개한 관람평이 없습니다.' : '';
+      more.textContent = '관람평 더 보기';
+      more.hidden = nextOffset === null;
+    } catch (error) {
+      if (disposed || !panel.isConnected) return;
+      if (nextOffset === 0) rating.textContent = '전체 평균 별점을 불러오지 못했습니다.';
+      status.textContent = '공개 관람평을 불러오지 못했습니다. ' + errorText(error);
+      status.className = 'status error';
+      more.textContent = '다시 불러오기';
+      more.hidden = false;
+    } finally {
+      loading = false;
+      more.disabled = false;
+    }
+  }
+  more.addEventListener('click', load);
+  return { summary, panel, load, dispose: () => { disposed = true; } };
+}
+
 async function renderMovie(context) {
   const app = context.app;
   const catalog = context.catalog;
@@ -88,6 +156,7 @@ async function renderMovie(context) {
     app.replaceChildren(empty);
     return;
   }
+  const community = createCommunity(repo);
 
   const genreNames = [];
   for (const row of catalog.MovieGenre) {
@@ -147,6 +216,7 @@ async function renderMovie(context) {
   const directors = el('p', { className: 'detail-credit' }, el('strong', {}, '감독:'), ' ', el('span', {}, creditNames(catalog, 'director')));
   const actors = el('p', { className: 'detail-credit' }, el('strong', {}, '출연:'), ' ', el('span', {}, creditNames(catalog, 'actor')));
   info.append(title, metadata, tags);
+  info.append(community.summary);
   if (watchCount > 0) info.append(ratingLine);
   info.append(overview, directors, actors);
   details.append(info);
@@ -190,6 +260,7 @@ async function renderMovie(context) {
     rows: 5,
     className: 'form-control',
     placeholder: '감상평을 입력하세요.',
+    maxLength: 10000,
     value: draft.review_text,
     disabled: busy
   });
@@ -216,6 +287,20 @@ async function renderMovie(context) {
   const reviewField = el('div', { className: 'field' });
   const reviewLabel = el('label', { htmlFor: 'review-text', className: 'form-label' }, '감상평 · 선택');
   reviewField.append(reviewLabel, review);
+  const publicReview = el('input', {
+    id: 'review-public', name: 'is_public', type: 'checkbox', className: 'form-check-input',
+    checked: draft.is_public, disabled: busy, 'aria-describedby': 'review-public-help'
+  });
+  function rememberVisibility() {
+    draft.is_public = publicReview.checked;
+  }
+  publicReview.addEventListener('change', rememberVisibility);
+  const publicField = el('div', { className: 'review-visibility' },
+    el('div', { className: 'form-check' }, publicReview,
+      el('label', { htmlFor: 'review-public', className: 'form-check-label' }, '다른 사용자에게 관람평 공개')),
+    el('p', { id: 'review-public-help', className: 'muted' }, '선택하면 닉네임·별점·관람평이 다른 로그인 사용자에게 표시됩니다. 감상 날짜와 사진은 공개되지 않습니다. 언제든 수정하여 비공개로 바꿀 수 있습니다.')
+  );
+  const ratingHelp = el('p', {}, '별점은 관람평 공개 여부와 관계없이 전체 평균에 익명으로 반영됩니다.');
   const formHelp = el('p', {}, '같은 영화를 같은 날 여러 번 감상한 기록도 각각 저장할 수 있습니다.');
   const status = el('p', { id: 'watch-status', className: 'status', ariaLive: 'polite' }, statusText);
   if (statusIsError) status.classList.add('error');
@@ -238,6 +323,7 @@ async function renderMovie(context) {
     currentDate.value = draft.watched_on;
     document.getElementById('rating').value = draft.rating;
     document.getElementById('review-text').value = draft.review_text;
+    document.getElementById('review-public').checked = draft.is_public;
     document.getElementById('watch-form-title').textContent = '감상 기록 추가';
     document.getElementById('watch-submit').textContent = '감상 기록 저장';
     const cancel = document.getElementById('watch-cancel');
@@ -262,7 +348,7 @@ async function renderMovie(context) {
     cancel.addEventListener('click', cancelEditing);
     buttons.append(cancel);
   }
-  form.append(fields, reviewField, formHelp, buttons, status);
+  form.append(fields, reviewField, publicField, ratingHelp, formHelp, buttons, status);
   formPanel.append(formTitle, form);
 
   async function saveRecord(event) {
@@ -271,6 +357,7 @@ async function renderMovie(context) {
     rememberDate();
     rememberRating();
     rememberReview();
+    rememberVisibility();
     setBusy(true);
     setStatus('기록을 저장하는 중입니다.', false);
     let action = 'create';
@@ -279,7 +366,8 @@ async function renderMovie(context) {
       movie_id: movieId,
       watched_on: draft.watched_on,
       rating: draft.rating,
-      review_text: draft.review_text
+      review_text: draft.review_text,
+      is_public: draft.is_public
     };
     if (editingId !== null) {
       payload.log_id = editingId;
@@ -328,6 +416,10 @@ async function renderMovie(context) {
     let reviewText = '남긴 감상평이 없습니다.';
     if (row.review_text) reviewText = row.review_text;
     const savedReview = el('p', { className: 'review-text' }, reviewText);
+    const visibility = el('span', { className: 'review-visibility-label' },
+      row.is_public ? (row.review_text ? '공개 관람평' : '공개 선택 · 관람평 미입력') : '비공개 관람평'
+    );
+    recordHeading.append(visibility);
     const updated = el('p', {}, '최근 저장: ' + new Date(row.updated_at).toLocaleString('ko-KR'));
     const actions = el('div', { className: 'toolbar' });
     const edit = el('button', { type: 'button', className: 'btn btn-link', disabled: busy }, '수정');
@@ -347,7 +439,7 @@ async function renderMovie(context) {
       if (row.rating !== null) ratingValue = String(row.rating);
       let reviewValue = '';
       if (row.review_text) reviewValue = row.review_text;
-      draft = { watched_on: row.watched_on, rating: ratingValue, review_text: reviewValue };
+      draft = { watched_on: row.watched_on, rating: ratingValue, review_text: reviewValue, is_public: row.is_public === true };
       setStatus('', false);
       try {
         const refreshed = await refreshPage();
@@ -400,12 +492,14 @@ async function renderMovie(context) {
   const recordLayout = el('div', { className: 'record-layout' });
   recordLayout.append(formPanel, recordPanel);
   const back = el('a', { href: 'movies.html', className: 'back-link' }, '← 영화 목록');
-  app.replaceChildren(back, details, recordLayout, mediaPanel);
+  app.replaceChildren(back, details, community.panel, recordLayout, mediaPanel);
+  community.load();
 
   const objectUrls = [];
   let disposed = false;
   function cleanupPhotos() {
     disposed = true;
+    community.dispose();
     for (const url of objectUrls) {
       URL.revokeObjectURL(url);
     }

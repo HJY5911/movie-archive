@@ -72,13 +72,16 @@ export function validateWatchLog(payload, catalog) {
   let review_text = null;
   if (input.review_text !== undefined && input.review_text !== null) {
     if (typeof input.review_text !== 'string') fields.review_text = '감상평은 글자로 입력해 주세요.';
-
+    else if (input.review_text.length > 10000) fields.review_text = '감상평은 10,000자 이하로 입력해 주세요.';
     else review_text = input.review_text.trim() || null;
   }
 
+  const is_public = input.is_public === undefined ? false : input.is_public;
+  if (typeof is_public !== 'boolean') fields.is_public = '관람평 공개 여부를 선택해 주세요.';
+
   if (Object.keys(fields).length) throw fieldError(fields);
 
-  return { movie_id: input.movie_id, watched_on: input.watched_on, rating, review_text };
+  return { movie_id: input.movie_id, watched_on: input.watched_on, rating, review_text, is_public };
 }
 
 function detectImageMime(bytes) {

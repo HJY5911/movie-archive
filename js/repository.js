@@ -307,6 +307,12 @@ export async function readSnapshot(repo) {
   return result;
 }
 
+export async function readMovieCommunity(repo, movieId, offset = 0) {
+  requireId(movieId, '영화 ID');
+  if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('관람평 목록 위치를 확인해 주세요.');
+  return serverRequest(repo, `/api/movies/${encodeURIComponent(movieId)}/community?offset=${offset}`);
+}
+
 export async function mutateWatchLog(repo, catalog, action, payload) {
   ensureRepository(repo);
   requirePayload(payload);

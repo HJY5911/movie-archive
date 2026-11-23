@@ -43,6 +43,17 @@
 
 ## 외부 서버로 옮길 때
 
+### 영화 상세 화면의 공유 정보
+
+- 전체 평균 별점은 사용자별로 **최근 저장한 별점이 있는 기록 1개**를 반영합니다. 관람평 공개 여부와 관계없이 익명으로 집계하며, 별점이 없는 기록은 제외합니다.
+- 관람평 작성·수정 화면의 **다른 사용자에게 관람평 공개**를 선택하면 닉네임·별점·글만 다른 로그인 사용자에게 표시됩니다. 기존 글과 새 글의 기본값은 비공개입니다. 공개를 해제하거나 기록을 삭제하면 이후 조회에서 제외됩니다.
+- `GET /api/movies/<movie_id>/community?offset=0`은 평균·참여 인원과 다른 사용자의 공개 관람평을 20개씩 반환합니다. 본인의 글은 나의 감상 기록에서 확인합니다. 응답에는 계정 ID·로그인 아이디·감상 날짜·사진이 포함되지 않습니다.
+- 캘린더·통계·업적은 기존 본인 기록만 사용합니다. 사진은 기존처럼 해당 브라우저의 계정별 보관함에 저장합니다.
+
+기존 서버를 이 버전으로 업데이트할 때는 **새 코드로 `python -m server init-db`를 실행한 뒤 웹 앱을 다시 시작**합니다. 이 명령은 `watch_logs.is_public` 열과 영화별 조회 인덱스를 추가하고, 기존 기록은 모두 비공개로 보존합니다. 반복 실행해도 기존 계정·별점·글·공개 설정을 초기화하지 않습니다. 운영 DB는 적용 전에 백업합니다.
+
+### 새 서버 설정
+
 Flask 실행과 MySQL, HTTPS를 지원하는 호스팅을 사용합니다. 영화 JSON을 MySQL로 옮길 필요는 없고, 사이트 파일과 Flask를 같은 주소에서 제공합니다. 기본 제공 주소를 사용할 수 있으므로 도메인 구매는 필수가 아닙니다.
 
 1. 호스팅에 MySQL DB와 이 프로젝트 전용 DB 계정을 준비합니다. DB 문자셋은 `utf8mb4`를 사용합니다.
@@ -73,12 +84,14 @@ JSON에 영화 ID를 추가·변경하면 서버도 다시 시작해야 입력 �
 ## 검증 및 재실행
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q tests/test_server.py
+.\.venv\Scripts\python.exe -m pytest -q tests/test_server.py tests/test_community.py
 .\.venv\Scripts\python.exe tests/run_mysql_tests.py
 ```
 
 첫 명령은 독립적인 메모리 DB로 서버 동작을 검사합니다. 둘째 명령은 개발 인스턴스의 `filmlog_server_test`만 사용하는 실제 MySQL 검사입니다. **테스트 DB에만 있는 검증용 계정·기록을 초기화하므로 브라우저 테스트와 동시에 실행하지 마세요.** 사용자의 `filmlog_server` DB는 초기화하지 않습니다.
 
 브라우저 통합 검사는 `tests/browser-smoke.cjs`, 결과는 `test-results/`에 있습니다. 실행에는 Node.js와 Playwright/Chromium이 필요합니다. 브라우저 테스트 서버는 `.venv/Scripts/python.exe tests/serve_test_app.py`로 별도 58802 포트에 띄웁니다.
+
+공유 기능의 화면 검사는 별도 터미널에서 `.venv/Scripts/python.exe tests/serve_community_test_app.py`로 빈 메모리 DB 서버를 시작한 뒤 `node tests/browser-community.cjs`를 실행합니다. 공개 선택·해제·삭제, 평균 계산, 개인 화면 분리, 관람평 더 보기, 모바일 화면과 오류 재시도를 확인합니다. 재검사할 때는 서버를 종료한 뒤 다시 시작하여 테스트 데이터를 비웁니다. 필요한 경우 `BASE_URL`과 `PLAYWRIGHT_MODULE` 환경 변수로 비어 있는 로컬 테스트 서버 주소와 Playwright 설치 위치를 지정합니다. 이 검사는 테스트 계정과 기록을 추가하므로 운영 사이트에서 실행하지 않습니다.
 
 참고: [Flask 공식 배포 안내](https://flask.palletsprojects.com/en/stable/deploying/), [PythonAnywhere Flask 배포](https://help.pythonanywhere.com/pages/Flask/).
