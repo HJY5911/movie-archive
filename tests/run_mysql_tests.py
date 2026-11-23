@@ -13,4 +13,4 @@ if url.host != '127.0.0.1' or url.database != 'filmlog_server' or url.port != 43
     raise SystemExit('Automatic tests are limited to the isolated local development database.')
 env = os.environ.copy()
 env['FILMLOG_TEST_DATABASE_URL'] = url.set(database='filmlog_server_test').render_as_string(hide_password=False)
-raise SystemExit(subprocess.call([sys.executable, '-m', 'pytest', '-q', 'tests/test_server.py'], cwd=root, env=env))
+raise SystemExit(subprocess.call([sys.executable, '-m', 'pytest', '-q', 'tests/test_server.py', 'tests/test_community.py'], cwd=root, env=env))

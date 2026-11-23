@@ -823,6 +823,67 @@ a:hover {
   margin-top: 32px;
 }
 
+.community-summary {
+  margin: 20px 0;
+  padding: 16px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 8px;
+}
+
+.community-summary .detail-rating {
+  margin-bottom: 8px;
+}
+
+.community-help,
+.review-visibility p {
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+}
+
+.community-reviews {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
+}
+
+.community-review {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 8px;
+}
+
+.community-review .review-text {
+  margin: 12px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.community-review .record-heading strong {
+  overflow-wrap: anywhere;
+}
+
+.community-panel .status {
+  margin: 16px 0;
+}
+
+.community-panel .status:empty {
+  display: none;
+}
+
+.community-panel .status.error {
+  color: var(--color-danger);
+}
+
+.review-visibility {
+  margin-bottom: 16px;
+}
+
+.review-visibility-label {
+  font-size: 0.8125rem;
+  color: var(--color-gray-700);
+}
+
 #record-form-panel {
   min-width: 0;
   padding: 24px;
