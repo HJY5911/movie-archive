@@ -1,7 +1,7 @@
 // 서버 연결과 계정 UI는 새 모듈에 모아 기존 페이지 파일을 그대로 사용합니다.
 const SESSION_CHANNEL = 'filmlog-server-session';
 const SESSION_EVENT_KEY = 'filmlog-server-session-event';
-const RETURN_PAGES = new Set(['/', '/index.html', '/movies.html', '/movie.html', '/calendar.html', '/map.html', '/series.html', '/stats.html', '/achievements.html', '/archive.html']);
+const RETURN_PAGES = new Set(['/', '/index.html', '/movies.html', '/movie.html', '/pick.html', '/calendar.html', '/map.html', '/series.html', '/stats.html', '/achievements.html', '/archive.html']);
 let watchedProfileId;
 let watcherStarted = false;
 let navigationStarted = false;

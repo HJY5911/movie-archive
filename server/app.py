@@ -29,6 +29,7 @@ WATCH_TIMEZONE = timezone(timedelta(hours=9), name="KST")
 PUBLIC_HTML = frozenset({
     "index.html", "movies.html", "movie.html", "calendar.html", "map.html",
     "series.html", "stats.html", "achievements.html", "archive.html", "login.html",
+    "pick.html",
 })
 PUBLIC_DIRS = frozenset({"css", "js", "assets", "data"})
 PUBLIC_EXTENSIONS = frozenset({
