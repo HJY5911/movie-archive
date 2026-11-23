@@ -94,7 +94,7 @@ export function movieCard(catalog, movie, { watched = false } = {}) {
 }
 
 const navigation = [
-  ['index', '메인'], ['movies', '영화 검색'], ['calendar', '캘린더'],
+  ['index', '메인'], ['movies', '영화 검색'], ['pick', '영화 뽑기'], ['calendar', '캘린더'],
   ['stats', '통계'], ['achievements', '업적'], ['archive', '사진 보관함'],
   ['series', '시리즈'], ['map', '지도']
 ];
