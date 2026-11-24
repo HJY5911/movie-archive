@@ -58,8 +58,6 @@ movie\_id     : 영화 한 편을 구분하는 고유 번호
 
 title           : 사이트에서 대표로 보여줄 영화 제목
 
-~~original\_title : 작품의 원래 언어로 된 제목~~
-
 release\_date	: 영화의 개봉 날짜
 
 runtime\_min	: 영화 전체 상영 시간, 단위는 분
@@ -128,8 +126,6 @@ movie\_id          : 이 별칭이 가리키는 영화
 
 alias                : 검색에 사용할 다른 이름·줄임말
 
-~~normalized\_alias : 검색하기 편하도록 공백·대소문자를 정리한 별칭~~
-
 
 
 Person : 인물 / MovieCredit : 출연·연출 연결 (N:M 연결을 위해 필요)
@@ -164,9 +160,9 @@ Country.country\_code         : KR, US 같은 국가 구분 코드
 
 Country.name                   : 대한민국, 미국 같은 표시용 국가 이름
 
-Country.pin\_lat                  : 지도에서 국가를 대표할 핀 위치의 위도 <- 위도와 경도를 하나의 데이터로 나타낼 시
+Country.pin\_lat                  : 지도에서 국가를 대표할 핀 위치의 위도
 
-Country.pin\_lng                 : 지도에서 국가를 대표할 핀 위치의 경도 <- 하나로 합쳐야 함
+Country.pin\_lng                 : 지도에서 국가를 대표할 핀 위치의 경도
 
 MovieCountry.movie\_id       : 제작 국가를 연결할 영화 번호
 
@@ -180,7 +176,7 @@ Series.series\_id                : 시리즈의 고유 번호
 
 Series.name                   : 시리즈 이름
 
-Series.description            : 시리즈를 소개하는 문장 <- 검토 필요
+Series.description            : 시리즈를 소개하는 문장
 
 SeriesMovie.movie\_id       : 시리즈에 포함되는 영화 번호
 
